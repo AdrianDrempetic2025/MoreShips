@@ -1,0 +1,24 @@
+name: MoreShips
+version: ${version}
+main: com.glooshy.ships.MoreShips
+api-version: '26.2'
+
+author: ThatGlooshy
+description: Custom multi-occupant modular combat-capable water vehicles. Project Beacon.
+
+website: https://youtube.com/@ThatGlooshy
+
+commands:
+  moreships:
+    description: MoreShips plugin management command
+    usage: /moreships [help|reload|info]
+    permission: moreships.admin
+    aliases:
+      - ships
+      - ship
+      - beacon
+
+permissions:
+  moreships.admin:
+    description: Full access to MoreShips admin commands
+    default: op
