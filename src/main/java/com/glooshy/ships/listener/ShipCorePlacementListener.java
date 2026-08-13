@@ -29,12 +29,10 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Handles both {@link Action#RIGHT_CLICK_BLOCK} (player clicked a water block
  * directly) and {@link Action#RIGHT_CLICK_AIR} (player's crosshair is on water
- * but the event fires as air because water is not always a directly-clickable
- * block). For the air case, the listener raytraces the player's view to find the
- * targeted fluid block.
+ * but the event fires as air). For the air case, the listener raytraces the
+ * player's view to find the targeted fluid block.
  *
- * <p>Records the last interact event for {@code /moreships debug} so players can
- * diagnose "why didn't placement fire" without server log access.
+ * <p>Spawn offset and sound are configurable (CON-01).
  */
 public final class ShipCorePlacementListener implements Listener {
 
@@ -43,18 +41,36 @@ public final class ShipCorePlacementListener implements Listener {
     private final ShipEntitySpawner entitySpawner;
     private final RuntimeBindingRegistry bindingRegistry;
 
-    // Last-event diagnostic (single-slot ring; V1 only needs the most recent)
+    private final double spawnOffsetX;
+    private final double spawnOffsetY;
+    private final double spawnOffsetZ;
+    private final Sound placementSound;
+    private final float soundVolume;
+    private final float soundPitch;
+
     private volatile String lastInteractDescription = "(no interact events seen yet)";
 
     public ShipCorePlacementListener(
             ShipCoreItem shipCoreItem,
             ShipRegistry shipRegistry,
             ShipEntitySpawner entitySpawner,
-            RuntimeBindingRegistry bindingRegistry) {
+            RuntimeBindingRegistry bindingRegistry,
+            double spawnOffsetX,
+            double spawnOffsetY,
+            double spawnOffsetZ,
+            Sound placementSound,
+            float soundVolume,
+            float soundPitch) {
         this.shipCoreItem = shipCoreItem;
         this.shipRegistry = shipRegistry;
         this.entitySpawner = entitySpawner;
         this.bindingRegistry = bindingRegistry;
+        this.spawnOffsetX = spawnOffsetX;
+        this.spawnOffsetY = spawnOffsetY;
+        this.spawnOffsetZ = spawnOffsetZ;
+        this.placementSound = placementSound;
+        this.soundVolume = soundVolume;
+        this.soundPitch = soundPitch;
     }
 
     @EventHandler
@@ -80,16 +96,16 @@ public final class ShipCorePlacementListener implements Listener {
 
         Ship ship = shipRegistry.createShip();
 
-        Location spawnLoc = target.getLocation().add(0.5, 1.0, 0.5);
+        Location spawnLoc = target.getLocation().add(spawnOffsetX, spawnOffsetY, spawnOffsetZ);
         UUID entityUuid = entitySpawner.spawnUnfinishedShip(spawnLoc, ship.identity());
 
         bindingRegistry.bind(RuntimeBinding.active(ship.identity(), entityUuid));
 
         inHand.setAmount(inHand.getAmount() - 1);
 
-        player.playSound(spawnLoc, Sound.BLOCK_CONDUIT_ACTIVATE, 0.7f, 1.2f);
+        player.playSound(spawnLoc, placementSound, soundVolume, soundPitch);
         player.sendMessage(Component.text(
-                "Placed ship core (id " + ship.identity().encoded() + ")",
+                "Placed ship core (id " + ship.identity().encoded() + ", phase " + ship.phase() + ")",
                 NamedTextColor.GREEN));
     }
 
@@ -103,7 +119,6 @@ public final class ShipCorePlacementListener implements Listener {
             return event.getClickedBlock();
         }
         if (action == Action.RIGHT_CLICK_AIR) {
-            // Player is looking at something not directly clickable; raytrace for fluids.
             return player.getTargetBlockExact(5, FluidCollisionMode.ALWAYS);
         }
         return null;

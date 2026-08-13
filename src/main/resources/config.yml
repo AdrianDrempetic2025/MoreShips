@@ -1,0 +1,22 @@
+# MoreShips (Project Beacon) configuration
+#
+# Edit this file and run /moreships reload (future slice) or restart the server.
+# All values must be present; defaults are listed below.
+
+shipCore:
+  # Base vanilla material used for the Ship Core item. Players see this texture
+  # until a custom resource pack overrides it.
+  baseMaterial: HEART_OF_THE_SEA
+  # Display name shown when the item is hovered.
+  displayName: "Ship Core"
+
+placement:
+  # Offset from the clicked block where the ship entity spawns.
+  spawnOffsetX: 0.5
+  spawnOffsetY: 1.0
+  spawnOffsetZ: 0.5
+  # Sound played on successful ship core placement.
+  # See: https://hub.spigotmc.org/javadocs/spigot/org/bukkit/Sound.html
+  sound: BLOCK_CONDUIT_ACTIVATE
+  soundVolume: 0.7
+  soundPitch: 1.2
