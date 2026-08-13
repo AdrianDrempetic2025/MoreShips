@@ -15,28 +15,27 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Listens for a player damaging the ArmorStand that represents an unfinished
- * ship. On damage, drops a Ship Core item at the entity location, transitions
- * the ship to REMOVED, releases the binding, and removes the entity from the
- * world. The damage event itself is cancelled so the ArmorStand does not take
- * real damage in the interim (DEFECT-04 / RQCA-21).
+ * Listens for damage to the ArmorStand that represents a ship.
  *
- * <p>V1 uses {@link EntityDamageByEntityEvent} rather than a paper-specific
- * ArmorStandBreakEvent because the latter is not present in Paper 26.2's API
- * surface. Damage event catches the same player-attacks-stand interaction.
+ * <p>For ANY custom-ship entity, the damage event is cancelled — ships have
+ * their own damage model (HP from the future combat slice), not vanilla
+ * ArmorStand damage. Cancelling prevents the ArmorStand from being destroyed
+ * by melee, explosions, fall, etc. — which would orphan the ship in the
+ * registry (DEFECT-11: FINALIZED_SHIP_BREAKABLE_VIA_MELEE).
  *
- * <p>Order of operations is intentional: the core is dropped BEFORE the
- * teardown service runs, so the player gets their input back even if the
- * service throws. The service is then expected to succeed because we just
- * verified the phase via {@link ShipTeardownService#isTeardownable}; a throw
- * at that point is a logic bug, not a state issue.
+ * <p>If the damager is a player and the ship is in a teardownable phase
+ * (UNFINISHED or HULL_APPLIED), the listener performs full teardown:
+ * drops the Ship Core (and hull material if applied), transitions the ship
+ * to REMOVED, releases the binding, and removes the entity.
  *
- * <p>Finalized ships are not teardownable via this path — damaging the
- * ArmorStand of a finalized ship is a no-op for this listener.
+ * <p>For FINALIZED / DESTROYED ships, the damage is cancelled but no teardown
+ * occurs — those phases have their own removal paths (HP=0 → DESTROYED;
+ * future slice).
  */
 public final class ShipEntityBreakListener implements Listener {
 
@@ -57,54 +56,65 @@ public final class ShipEntityBreakListener implements Listener {
     }
 
     @EventHandler
-    public void onEntityDamageByEntity(@NotNull EntityDamageByEntityEvent event) {
+    public void onEntityDamage(@NotNull EntityDamageEvent event) {
         if (!(event.getEntity() instanceof ArmorStand stand)) {
-            return;
-        }
-        if (!(event.getDamager() instanceof Player player)) {
             return;
         }
 
         Optional<RuntimeBinding> binding = bindingRegistry.findByEntity(stand.getUniqueId());
         if (binding.isEmpty()) {
-            return; // Not a custom ship entity; vanilla ArmorStand damage proceeds
+            return; // Not a custom ship — vanilla damage proceeds
         }
+
+        // Custom ship entity — ALWAYS cancel damage. The ship has its own
+        // damage model (HP from future combat slice). Vanilla ArmorStand
+        // damage is not the destruction path.
+        event.setCancelled(true);
 
         var shipId = binding.get().shipId();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {
-            // Orphan binding (shouldn't happen, but defensive) — release it
+            // Orphan binding (ship was REMOVED but binding lingers) — release
             bindingRegistry.release(shipId);
             return;
         }
         Ship ship = shipOpt.get();
 
-        if (!ShipTeardownService.isTeardownable(ship.phase())) {
-            return; // Don't touch FINALIZED/DESTROYED ships via this path
+        // Only player damage triggers teardown consideration
+        Player player = damagerAsPlayer(event);
+        if (player == null) {
+            return; // Non-player damage: just protect, no teardown
         }
 
-        // Cancel the damage so the ArmorStand doesn't take real damage while
-        // we clean up. We're going to remove the entity manually.
-        event.setCancelled(true);
+        if (!ShipTeardownService.isTeardownable(ship.phase())) {
+            // FINALIZED / DESTROYED — invincible to melee in V1
+            player.sendMessage(Component.text(
+                    "This ship cannot be damaged by melee.",
+                    NamedTextColor.GRAY));
+            return;
+        }
 
-        // Drop the Ship Core BEFORE mutating state — player keeps the input
-        // even if the subsequent service call somehow fails.
+        // Pre-finalization teardown — drop inputs BEFORE state mutation
         stand.getWorld().dropItemNaturally(stand.getLocation(), shipCoreItem.create());
 
-        // If the ship had a hull applied, return that block too (RQCA-21:
-        // teardown returns ALL inputs, not just the core).
         Material hull = ship.hullMaterial();
         if (hull != null) {
             stand.getWorld().dropItemNaturally(stand.getLocation(), new ItemStack(hull));
         }
 
         teardownService.teardown(shipId);
-
         stand.remove();
 
         String recovery = hull != null
                 ? "Recovered Ship Core + " + hull.name() + " from ship."
                 : "Recovered Ship Core from unfinished ship.";
         player.sendMessage(Component.text(recovery, NamedTextColor.GREEN));
+    }
+
+    private static Player damagerAsPlayer(EntityDamageEvent event) {
+        if (!(event instanceof EntityDamageByEntityEvent byEntity)) {
+            return null;
+        }
+        return byEntity.getDamager() instanceof Player p ? p : null;
     }
 }
