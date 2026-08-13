@@ -1,6 +1,8 @@
 package com.glooshy.ships.command;
 
 import com.glooshy.ships.item.ShipCoreItem;
+import com.glooshy.ships.runtime.RuntimeBindingRegistry;
+import com.glooshy.ships.ship.ShipRegistry;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
@@ -14,16 +16,20 @@ import org.jetbrains.annotations.NotNull;
  * /moreships command — admin surface.
  *
  * <p>V1 supports {@code give} (hand a ship core to the executing player) and
- * {@code info} (registry statistics). Future subcommands: reload, list, debug.
+ * {@code info} (registry + binding statistics).
  */
 public final class ShipsCommand implements CommandExecutor {
 
     private final ShipCoreItem shipCoreItem;
-    private final com.glooshy.ships.ship.ShipRegistry shipRegistry;
+    private final ShipRegistry shipRegistry;
+    private final RuntimeBindingRegistry bindingRegistry;
 
-    public ShipsCommand(ShipCoreItem shipCoreItem, com.glooshy.ships.ship.ShipRegistry shipRegistry) {
+    public ShipsCommand(ShipCoreItem shipCoreItem,
+                        ShipRegistry shipRegistry,
+                        RuntimeBindingRegistry bindingRegistry) {
         this.shipCoreItem = shipCoreItem;
         this.shipRegistry = shipRegistry;
+        this.bindingRegistry = bindingRegistry;
     }
 
     @Override
@@ -56,12 +62,14 @@ public final class ShipsCommand implements CommandExecutor {
     private void handleInfo(CommandSender sender) {
         sender.sendMessage(Component.text(
                 "Live ships: " + shipRegistry.size(), NamedTextColor.AQUA));
+        sender.sendMessage(Component.text(
+                "Active bindings: " + bindingRegistry.activeCount(), NamedTextColor.AQUA));
     }
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("/moreships give", NamedTextColor.AQUA)
                 .append(Component.text(" — receive a Ship Core", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships info", NamedTextColor.AQUA)
-                .append(Component.text(" — show live ship count", NamedTextColor.GRAY)));
+                .append(Component.text(" — show live ship + binding counts", NamedTextColor.GRAY)));
     }
 }
