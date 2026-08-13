@@ -20,3 +20,10 @@ placement:
   sound: BLOCK_CONDUIT_ACTIVATE
   soundVolume: 0.7
   soundPitch: 1.2
+
+hull:
+  # Minimum block hardness required for a hull material. Default 1.0 accepts
+  # most wood, stone, and metal blocks; rejects dirt, wool, leaves, glass,
+  # etc. Server owners can lower (more permissive) or raise (stricter).
+  # Per-material overrides are a future slice.
+  minHardness: 1.0

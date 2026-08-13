@@ -2,8 +2,10 @@ package com.glooshy.ships;
 
 import com.glooshy.ships.command.ShipsCommand;
 import com.glooshy.ships.config.MoreShipsConfig;
+import com.glooshy.ships.hull.HullValidator;
 import com.glooshy.ships.identity.ShipIdentityGenerator;
 import com.glooshy.ships.item.ShipCoreItem;
+import com.glooshy.ships.listener.HullApplicationListener;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
 import com.glooshy.ships.listener.ShipEntityBreakListener;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
@@ -19,6 +21,7 @@ import org.bukkit.plugin.java.JavaPlugin;
  *
  * <p>BUILD-03a: config system + lifecycle phase.
  * <p>BUILD-03b: teardown conservation (RQCA-21).
+ * <p>BUILD-04: hull application (RQCA-04, material validation, CON-01 minHardness).
  */
 public final class MoreShips extends JavaPlugin {
 
@@ -38,6 +41,7 @@ public final class MoreShips extends JavaPlugin {
         ShipEntitySpawner entitySpawner = new ShipEntitySpawner(shipIdKey);
         RuntimeBindingRegistry bindingRegistry = new RuntimeBindingRegistry();
         ShipTeardownService teardownService = new ShipTeardownService(shipRegistry, bindingRegistry);
+        HullValidator hullValidator = new HullValidator(config.hullMinHardness());
 
         ShipCorePlacementListener placementListener = new ShipCorePlacementListener(
                 shipCoreItem,
@@ -56,6 +60,10 @@ public final class MoreShips extends JavaPlugin {
                 shipCoreItem, bindingRegistry, shipRegistry, teardownService);
         getServer().getPluginManager().registerEvents(breakListener, this);
 
+        HullApplicationListener hullListener = new HullApplicationListener(
+                shipRegistry, bindingRegistry, hullValidator);
+        getServer().getPluginManager().registerEvents(hullListener, this);
+
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, shipRegistry, bindingRegistry, placementListener);
         PluginCommand command = getCommand("moreships");
@@ -66,7 +74,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-03b). Teardown conservation + break listener in place.");
+        getLogger().info("MoreShips enabled (BUILD-04). Hull application in place.");
     }
 
     @Override

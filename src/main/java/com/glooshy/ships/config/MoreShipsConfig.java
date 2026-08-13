@@ -59,4 +59,8 @@ public final class MoreShipsConfig {
     public float placementSoundPitch() {
         return (float) config.getDouble("placement.soundPitch", 1.2);
     }
+
+    public double hullMinHardness() {
+        return config.getDouble("hull.minHardness", 1.0);
+    }
 }

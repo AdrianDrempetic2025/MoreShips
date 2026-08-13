@@ -6,16 +6,19 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.bukkit.Material;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Authoritative owner of the live ship set + ship lifecycle state.
+ * Authoritative owner of the live ship set + ship lifecycle state + hull
+ * material.
  *
- * <p>Every ship starts in {@link LifecyclePhase#UNFINISHED} when created.
- * Transitions are validated by {@link LifecycleTransition}; invalid transitions
- * throw {@link IllegalStateException} (defense for DEFECT-05 ILLEGAL_TRANSITION).
+ * <p>Every ship starts in {@link LifecyclePhase#UNFINISHED} with null hull
+ * material. Hull application transitions UNFINISHED → HULL_APPLIED and sets
+ * the hull material atomically. Further phase transitions preserve the hull.
  *
- * <p>Thread-safe: createShip and transition may be called from any thread.
- * transition uses {@link ConcurrentMap#compute} to ensure atomicity.
+ * <p>Transition to {@link LifecyclePhase#REMOVED} deletes the entry entirely
+ * (terminal "gone" state). DESTROYED stays in the map for future wreck lookup.
  */
 public final class ShipRegistry {
 
@@ -28,7 +31,7 @@ public final class ShipRegistry {
 
     public Ship createShip() {
         ShipIdentity identity = generator.generate();
-        Ship ship = new Ship(identity, LifecyclePhase.UNFINISHED);
+        Ship ship = new Ship(identity, LifecyclePhase.UNFINISHED, null);
 
         Ship existing = ships.putIfAbsent(identity, ship);
         if (existing != null) {
@@ -36,6 +39,26 @@ public final class ShipRegistry {
                     "Ship identity collision: " + identity + " already in registry");
         }
         return ship;
+    }
+
+    public Ship applyHull(ShipIdentity identity, @Nullable Material hullMaterial) {
+        Objects.requireNonNull(identity, "identity");
+        // hullMaterial is @Nullable for testability — org.bukkit.Material's
+        // static initializer requires server context, so unit tests cannot
+        // construct or reference Material constants. Production callers (the
+        // hull-application listener) MUST pass a validated non-null Material;
+        // the validator + listener guard that contract.
+        return ships.compute(identity, (key, current) -> {
+            if (current == null) {
+                throw new IllegalStateException("Ship not found: " + identity);
+            }
+            if (current.phase() != LifecyclePhase.UNFINISHED) {
+                throw new IllegalStateException(
+                        "Cannot apply hull to ship in phase " + current.phase()
+                                + " (only UNFINISHED ships accept hull)");
+            }
+            return new Ship(key, LifecyclePhase.HULL_APPLIED, hullMaterial);
+        });
     }
 
     public Ship transition(ShipIdentity identity, LifecyclePhase newPhase) {
@@ -51,12 +74,9 @@ public final class ShipRegistry {
                                 + " (allowed: " + LifecycleTransition.validTargets(current.phase()) + ")");
             }
             if (newPhase == LifecyclePhase.REMOVED) {
-                // REMOVED is a terminal "gone" state — delete the entry entirely
-                // so it no longer counts as live. Returns a snapshot Ship for the
-                // caller; the registry itself holds no reference.
                 return null;
             }
-            return new Ship(key, newPhase);
+            return new Ship(key, newPhase, current.hullMaterial());
         });
     }
 
