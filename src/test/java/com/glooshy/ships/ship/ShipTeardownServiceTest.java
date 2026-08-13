@@ -47,10 +47,10 @@ class ShipTeardownServiceTest {
      *
      * <p>Mutation plan: make {@code ShipTeardownService.teardown} a no-op (don't
      * call {@code shipRegistry.transition}). Expected RED: the assertion that
-     * phase == REMOVED after teardown fails.
+     * the ship is gone from the registry fails.
      */
     @Test
-    void teardown_transitions_unfinished_ship_to_removed() {
+    void teardown_removes_ship_from_registry() {
         ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid());
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
@@ -61,10 +61,10 @@ class ShipTeardownServiceTest {
 
         service.teardown(ship.identity());
 
-        Optional<Ship> after = ships.find(ship.identity());
-        assertTrue(after.isPresent(), "Ship must still be in the registry (as REMOVED, not deleted)");
-        assertEquals(LifecyclePhase.REMOVED, after.get().phase(),
-                "Ship must be in REMOVED phase after teardown (DEFECT-04)");
+        assertTrue(ships.find(ship.identity()).isEmpty(),
+                "Ship must be removed from the registry after teardown (DEFECT-04)");
+        assertEquals(0, ships.size(),
+                "Live ship count must drop to zero after teardown");
     }
 
     /**
@@ -106,8 +106,8 @@ class ShipTeardownServiceTest {
 
         service.teardown(ship.identity());
 
-        assertEquals(LifecyclePhase.REMOVED,
-                ships.phaseOf(ship.identity()).orElseThrow());
+        assertTrue(ships.find(ship.identity()).isEmpty(),
+                "Hull-applied ship must also be removed from registry on teardown");
     }
 
     /**

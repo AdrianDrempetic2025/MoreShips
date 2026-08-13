@@ -50,6 +50,12 @@ public final class ShipRegistry {
                         "Invalid lifecycle transition: " + current.phase() + " → " + newPhase
                                 + " (allowed: " + LifecycleTransition.validTargets(current.phase()) + ")");
             }
+            if (newPhase == LifecyclePhase.REMOVED) {
+                // REMOVED is a terminal "gone" state — delete the entry entirely
+                // so it no longer counts as live. Returns a snapshot Ship for the
+                // caller; the registry itself holds no reference.
+                return null;
+            }
             return new Ship(key, newPhase);
         });
     }
