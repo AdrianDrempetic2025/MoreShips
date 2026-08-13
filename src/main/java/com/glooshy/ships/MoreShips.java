@@ -5,9 +5,11 @@ import com.glooshy.ships.config.MoreShipsConfig;
 import com.glooshy.ships.identity.ShipIdentityGenerator;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
+import com.glooshy.ships.listener.ShipEntityBreakListener;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ShipEntitySpawner;
 import com.glooshy.ships.ship.ShipRegistry;
+import com.glooshy.ships.ship.ShipTeardownService;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -15,8 +17,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 /**
  * Project Beacon — Custom Ship System for Paper 26.2.
  *
- * <p>BUILD-03a: introduces the config system (CON-01 alignment) and lifecycle
- * phase on the Ship record (SCIN-01 alignment).
+ * <p>BUILD-03a: config system + lifecycle phase.
+ * <p>BUILD-03b: teardown conservation (RQCA-21).
  */
 public final class MoreShips extends JavaPlugin {
 
@@ -35,6 +37,7 @@ public final class MoreShips extends JavaPlugin {
         ShipRegistry shipRegistry = new ShipRegistry(ShipIdentityGenerator.uuid());
         ShipEntitySpawner entitySpawner = new ShipEntitySpawner(shipIdKey);
         RuntimeBindingRegistry bindingRegistry = new RuntimeBindingRegistry();
+        ShipTeardownService teardownService = new ShipTeardownService(shipRegistry, bindingRegistry);
 
         ShipCorePlacementListener placementListener = new ShipCorePlacementListener(
                 shipCoreItem,
@@ -49,6 +52,10 @@ public final class MoreShips extends JavaPlugin {
                 config.placementSoundPitch());
         getServer().getPluginManager().registerEvents(placementListener, this);
 
+        ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
+                shipCoreItem, bindingRegistry, shipRegistry, teardownService);
+        getServer().getPluginManager().registerEvents(breakListener, this);
+
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, shipRegistry, bindingRegistry, placementListener);
         PluginCommand command = getCommand("moreships");
@@ -59,7 +66,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-03a). Config + lifecycle phase in place.");
+        getLogger().info("MoreShips enabled (BUILD-03b). Teardown conservation + break listener in place.");
     }
 
     @Override
