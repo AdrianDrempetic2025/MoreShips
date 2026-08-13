@@ -2,30 +2,37 @@ package com.glooshy.ships.command;
 
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
+import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
+import com.glooshy.ships.ship.LifecyclePhase;
+import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * /moreships command — admin surface with tab completion.
  *
- * <p>Subcommands: {@code give} (hand a ship core), {@code info} (counts),
- * {@code debug} (last-interact + main-hand diagnostics), {@code help}.
+ * <p>Subcommands: {@code give}, {@code info}, {@code finalize}, {@code debug}, {@code help}.
  */
 public final class ShipsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("give", "info", "debug", "help");
+            List.of("give", "info", "finalize", "debug", "help");
+
+    private static final int FINALIZE_RAYTRACE_DISTANCE = 5;
 
     private final ShipCoreItem shipCoreItem;
     private final ShipRegistry shipRegistry;
@@ -52,6 +59,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         switch (args[0].toLowerCase()) {
             case "give" -> handleGive(sender);
             case "info" -> handleInfo(sender);
+            case "finalize" -> handleFinalize(sender);
             case "debug" -> handleDebug(sender);
             case "help" -> sendHelp(sender);
             default -> sender.sendMessage(Component.text(
@@ -93,6 +101,68 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                 "Active bindings: " + bindingRegistry.activeCount(), NamedTextColor.AQUA));
     }
 
+    private void handleFinalize(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can finalize ships.", NamedTextColor.RED));
+            return;
+        }
+
+        Entity target = player.getTargetEntity(FINALIZE_RAYTRACE_DISTANCE);
+        if (target == null) {
+            player.sendMessage(Component.text(
+                    "Look at a ship within " + FINALIZE_RAYTRACE_DISTANCE
+                            + " blocks and run /moreships finalize again.",
+                    NamedTextColor.RED));
+            return;
+        }
+
+        Optional<RuntimeBinding> binding = bindingRegistry.findByEntity(target.getUniqueId());
+        if (binding.isEmpty()) {
+            player.sendMessage(Component.text("That entity is not a ship.", NamedTextColor.RED));
+            return;
+        }
+
+        var shipId = binding.get().shipId();
+        Optional<Ship> shipOpt = shipRegistry.find(shipId);
+        if (shipOpt.isEmpty()) {
+            player.sendMessage(Component.text(
+                    "Ship no longer exists in registry.", NamedTextColor.RED));
+            return;
+        }
+        Ship ship = shipOpt.get();
+
+        LifecyclePhase phase = ship.phase();
+        if (phase != LifecyclePhase.HULL_APPLIED) {
+            player.sendMessage(Component.text(
+                    refusalMessage(phase), NamedTextColor.RED));
+            return;
+        }
+
+        try {
+            Ship finalized = shipRegistry.transition(shipId, LifecyclePhase.FINALIZED);
+            player.sendMessage(Component.text(
+                    "Finalized ship " + finalized.identity().encoded()
+                            + ". This is irreversible.",
+                    NamedTextColor.GREEN));
+        } catch (IllegalStateException e) {
+            player.sendMessage(Component.text(
+                    "Cannot finalize: " + e.getMessage(), NamedTextColor.RED));
+        }
+    }
+
+    private static @NotNull String refusalMessage(@Nullable LifecyclePhase phase) {
+        if (phase == null) {
+            return "Ship has no phase.";
+        }
+        return switch (phase) {
+            case UNFINISHED -> "Ship is unfinished. Apply a hull material first.";
+            case FINALIZED -> "Ship is already finalized.";
+            case DESTROYED -> "Ship is destroyed.";
+            case REMOVED -> "Ship is removed.";
+            default -> "Ship cannot be finalized in phase " + phase + ".";
+        };
+    }
+
     private void handleDebug(CommandSender sender) {
         sender.sendMessage(Component.text("Last interact: ", NamedTextColor.AQUA)
                 .append(Component.text(placementListener.lastInteractDescription(), NamedTextColor.YELLOW)));
@@ -116,6 +186,8 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" — receive a Ship Core", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships info", NamedTextColor.AQUA)
                 .append(Component.text(" — show live ship + binding counts", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/moreships finalize", NamedTextColor.AQUA)
+                .append(Component.text(" — finalize the ship you are looking at (HULL_APPLIED only)", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships debug", NamedTextColor.AQUA)
                 .append(Component.text(" — show last interact + main hand state", NamedTextColor.GRAY)));
     }

@@ -9,11 +9,13 @@ import com.glooshy.ships.ship.ShipTeardownService;
 import java.util.Optional;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Material;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -89,11 +91,20 @@ public final class ShipEntityBreakListener implements Listener {
         // even if the subsequent service call somehow fails.
         stand.getWorld().dropItemNaturally(stand.getLocation(), shipCoreItem.create());
 
+        // If the ship had a hull applied, return that block too (RQCA-21:
+        // teardown returns ALL inputs, not just the core).
+        Material hull = ship.hullMaterial();
+        if (hull != null) {
+            stand.getWorld().dropItemNaturally(stand.getLocation(), new ItemStack(hull));
+        }
+
         teardownService.teardown(shipId);
 
         stand.remove();
 
-        player.sendMessage(Component.text(
-                "Recovered Ship Core from unfinished ship.", NamedTextColor.GREEN));
+        String recovery = hull != null
+                ? "Recovered Ship Core + " + hull.name() + " from ship."
+                : "Recovered Ship Core from unfinished ship.";
+        player.sendMessage(Component.text(recovery, NamedTextColor.GREEN));
     }
 }
