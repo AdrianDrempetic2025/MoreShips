@@ -49,4 +49,24 @@ public final class ShipCoreItem {
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
         return pdc.has(markerKey, PersistentDataType.BYTE);
     }
+
+    /**
+     * Diagnostic — describe the item's relevant state.
+     * Used by {@code /moreships debug} when placement is not behaving.
+     */
+    public @NotNull String diagnose(@NotNull ItemStack stack) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("type=").append(stack.getType());
+        sb.append(" amount=").append(stack.getAmount());
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            sb.append(" meta=none");
+        } else {
+            PersistentDataContainer pdc = meta.getPersistentDataContainer();
+            sb.append(" marker=").append(pdc.has(markerKey, PersistentDataType.BYTE));
+            sb.append(" hasDisplayName=").append(meta.hasDisplayName());
+        }
+        sb.append(" isShipCore=").append(isShipCore(stack));
+        return sb.toString();
+    }
 }

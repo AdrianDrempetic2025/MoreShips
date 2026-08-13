@@ -8,42 +8,39 @@ import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ShipEntitySpawner;
 import com.glooshy.ships.ship.ShipRegistry;
 import org.bukkit.NamespacedKey;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * Project Beacon — Custom Ship System for Paper 26.2.
- *
- * <p>V1 / BUILD-01: ship core item + placement in water creates a ship with
- * a unique identity.
- *
- * <p>V1 / BUILD-02 (this revision): the placed ship now has a visible runtime
- * entity (glowing ArmorStand) at the click location, bound bidirectionally
- * to the ship identity. Future slices: persistence, hull application, etc.
  */
 public final class MoreShips extends JavaPlugin {
-
-    private ShipRegistry shipRegistry;
-    private ShipCoreItem shipCoreItem;
-    private RuntimeBindingRegistry bindingRegistry;
 
     @Override
     public void onEnable() {
         NamespacedKey shipCoreMarker = new NamespacedKey(this, "ship_core_marker");
         NamespacedKey shipIdKey = new NamespacedKey(this, "ship_id");
 
-        shipCoreItem = new ShipCoreItem(shipCoreMarker);
-        shipRegistry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipCoreItem shipCoreItem = new ShipCoreItem(shipCoreMarker);
+        ShipRegistry shipRegistry = new ShipRegistry(ShipIdentityGenerator.uuid());
         ShipEntitySpawner entitySpawner = new ShipEntitySpawner(shipIdKey);
-        bindingRegistry = new RuntimeBindingRegistry();
+        RuntimeBindingRegistry bindingRegistry = new RuntimeBindingRegistry();
 
-        getServer().getPluginManager().registerEvents(
-                new ShipCorePlacementListener(shipCoreItem, shipRegistry, entitySpawner, bindingRegistry),
-                this);
+        ShipCorePlacementListener placementListener = new ShipCorePlacementListener(
+                shipCoreItem, shipRegistry, entitySpawner, bindingRegistry);
+        getServer().getPluginManager().registerEvents(placementListener, this);
 
-        getCommand("moreships").setExecutor(
-                new ShipsCommand(shipCoreItem, shipRegistry, bindingRegistry));
+        ShipsCommand shipsCommand = new ShipsCommand(
+                shipCoreItem, shipRegistry, bindingRegistry, placementListener);
+        PluginCommand command = getCommand("moreships");
+        if (command != null) {
+            command.setExecutor(shipsCommand);
+            command.setTabCompleter(shipsCommand);
+        } else {
+            getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
+        }
 
-        getLogger().info("MoreShips enabled. Ship Core placement is live (with runtime entity).");
+        getLogger().info("MoreShips enabled (BUILD-02b). Ship Core placement is live.");
     }
 
     @Override
