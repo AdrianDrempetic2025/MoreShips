@@ -2,11 +2,13 @@ package com.glooshy.ships.ship;
 
 import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.identity.ShipIdentityGenerator;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.bukkit.Material;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -94,5 +96,24 @@ public final class ShipRegistry {
 
     public void remove(ShipIdentity identity) {
         ships.remove(identity);
+    }
+
+    /**
+     * Replace the entire live ship set with the given ships (persistence load).
+     * Existing state is wiped.
+     */
+    public void load(@NotNull java.util.List<Ship> toLoad) {
+        Objects.requireNonNull(toLoad);
+        ships.clear();
+        for (Ship ship : toLoad) {
+            ships.put(ship.identity(), ship);
+        }
+    }
+
+    /**
+     * Snapshot the current live ships for persistence save.
+     */
+    public @NotNull java.util.List<Ship> snapshot() {
+        return List.copyOf(ships.values());
     }
 }

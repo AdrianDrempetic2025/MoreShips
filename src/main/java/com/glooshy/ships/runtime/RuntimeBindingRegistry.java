@@ -1,11 +1,13 @@
 package com.glooshy.ships.runtime;
 
 import com.glooshy.ships.identity.ShipIdentity;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Authoritative owner of the live ship↔entity binding.
@@ -64,5 +66,30 @@ public final class RuntimeBindingRegistry {
 
     public int activeCount() {
         return byShip.size();
+    }
+
+    /**
+     * Replace the entire live binding set with the given bindings (persistence load).
+     * Existing state is wiped. Skips RELEASED bindings — only ACTIVE is persisted
+     * in V1.
+     */
+    public void load(@NotNull java.util.List<RuntimeBinding> toLoad) {
+        java.util.Objects.requireNonNull(toLoad);
+        byShip.clear();
+        byEntity.clear();
+        for (RuntimeBinding binding : toLoad) {
+            if (binding.state() != BindingState.ACTIVE) {
+                continue;
+            }
+            byShip.put(binding.shipId(), binding);
+            byEntity.put(binding.entityUuid(), binding);
+        }
+    }
+
+    /**
+     * Snapshot the current active bindings for persistence save.
+     */
+    public @NotNull java.util.List<RuntimeBinding> snapshot() {
+        return List.copyOf(byShip.values());
     }
 }
