@@ -63,4 +63,8 @@ public final class MoreShipsConfig {
     public double hullMinHardness() {
         return config.getDouble("hull.minHardness", 1.0);
     }
+
+    public double hpMultiplier() {
+        return config.getDouble("hp.multiplier", 10.0);
+    }
 }

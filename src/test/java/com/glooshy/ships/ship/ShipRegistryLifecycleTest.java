@@ -25,7 +25,7 @@ class ShipRegistryLifecycleTest {
      */
     @Test
     void createShip_starts_in_unfinished_phase() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
 
         Ship ship = registry.createShip();
 
@@ -35,7 +35,7 @@ class ShipRegistryLifecycleTest {
 
     @Test
     void transition_applies_valid_phase_change() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         Ship ship = registry.createShip();
 
         Ship transitioned = registry.transition(ship.identity(), LifecyclePhase.HULL_APPLIED);
@@ -46,7 +46,7 @@ class ShipRegistryLifecycleTest {
 
     @Test
     void transition_throws_on_invalid_path() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         Ship ship = registry.createShip();
 
         // UNFINISHED → FINALIZED is invalid (must go through HULL_APPLIED)
@@ -58,7 +58,7 @@ class ShipRegistryLifecycleTest {
 
     @Test
     void transition_throws_on_unknown_ship() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         ShipIdentity unknown = ShipIdentity.fromUuid(UUID.randomUUID());
 
         assertThrows(IllegalStateException.class,
@@ -67,7 +67,7 @@ class ShipRegistryLifecycleTest {
 
     @Test
     void transition_is_atomic_under_concurrent_attempts() throws Exception {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         Ship ship = registry.createShip();
 
         int threads = 8;

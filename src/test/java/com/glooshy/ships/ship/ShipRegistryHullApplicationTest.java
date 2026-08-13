@@ -25,7 +25,7 @@ class ShipRegistryHullApplicationTest {
      */
     @Test
     void applyHull_transitions_unfinished_to_hull_applied() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         Ship ship = registry.createShip();
 
         Ship updated = registry.applyHull(ship.identity(), null);
@@ -38,7 +38,7 @@ class ShipRegistryHullApplicationTest {
 
     @Test
     void applyHull_stores_hull_material_reference() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         Ship ship = registry.createShip();
 
         // Pass a sentinel non-null value; we use a String-marked Object since
@@ -51,7 +51,7 @@ class ShipRegistryHullApplicationTest {
 
     @Test
     void applyHull_throws_for_non_unfinished_ship() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         Ship ship = registry.createShip();
         registry.applyHull(ship.identity(), null);
 
@@ -63,7 +63,7 @@ class ShipRegistryHullApplicationTest {
 
     @Test
     void applyHull_throws_for_unknown_ship() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
 
         assertThrows(IllegalStateException.class,
                 () -> registry.applyHull(
@@ -72,7 +72,7 @@ class ShipRegistryHullApplicationTest {
 
     @Test
     void new_ship_has_null_hull_material() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
 
         Ship ship = registry.createShip();
 
@@ -81,7 +81,7 @@ class ShipRegistryHullApplicationTest {
 
     @Test
     void applyHull_concurrent_only_one_wins() throws Exception {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         Ship ship = registry.createShip();
 
         int threads = 8;

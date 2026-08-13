@@ -27,3 +27,9 @@ hull:
   # etc. Server owners can lower (more permissive) or raise (stricter).
   # Per-material overrides are a future slice.
   minHardness: 1.0
+
+hp:
+  # Ship max HP = round(hullHardness × multiplier), clamped to minimum 1.
+  # Default 10 → stone (1.5) = 15 HP, obsidian (50) = 500 HP, planks (2) = 20.
+  # Future slice adds core-size modifier and module HP changes per L1 spec.
+  multiplier: 10.0

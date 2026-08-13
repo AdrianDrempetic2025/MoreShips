@@ -7,16 +7,30 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Domain entity: a ship with an immutable {@link ShipIdentity}, a current
- * {@link LifecyclePhase}, and (once hull is applied) a {@link Material} hull.
+ * {@link LifecyclePhase}, hull material, and current/max HP.
  *
- * <p>Identity is fixed at construction; phase changes via copy-of-this with a
- * new phase value (preserving hullMaterial). The {@link ShipRegistry} is the
- * sole authority for transitions and hull application.
+ * <p>HP fields are -1 for ships that have not yet had a hull applied
+ * (UNFINISHED). On hull application, currentHp and maxHp are set to the
+ * computed value derived from material hardness. Damage reduces currentHp;
+ * at 0, the ship transitions to DESTROYED.
  */
-public record Ship(ShipIdentity identity, LifecyclePhase phase, @Nullable Material hullMaterial) {
+public record Ship(
+        ShipIdentity identity,
+        LifecyclePhase phase,
+        @Nullable Material hullMaterial,
+        int currentHp,
+        int maxHp) {
 
     public Ship {
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(phase, "phase");
+    }
+
+    /**
+     * Convenience constructor for ships without hull material (e.g., new
+     * ships). HP fields default to -1 (sentinel for "no HP yet").
+     */
+    public Ship(ShipIdentity identity, LifecyclePhase phase, @Nullable Material hullMaterial) {
+        this(identity, phase, hullMaterial, -1, -1);
     }
 }

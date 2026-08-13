@@ -28,7 +28,7 @@ class ShipRegistryTest {
      */
     @Test
     void createShip_produces_distinct_identities() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
 
         Ship first = registry.createShip();
         Ship second = registry.createShip();
@@ -48,7 +48,7 @@ class ShipRegistryTest {
      */
     @Test
     void createShip_many_creations_remain_distinct() {
-        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         Set<ShipIdentity> seen = new HashSet<>();
 
         for (int i = 0; i < 1000; i++) {
@@ -65,7 +65,7 @@ class ShipRegistryTest {
     @Test
     void createShip_rejects_duplicate_identity_from_generator() {
         ShipIdentityGenerator constant = constantGenerator();
-        ShipRegistry registry = new ShipRegistry(constant);
+        ShipRegistry registry = new ShipRegistry(constant, new com.glooshy.ships.hull.HpCalculator(10.0));
 
         registry.createShip();
 

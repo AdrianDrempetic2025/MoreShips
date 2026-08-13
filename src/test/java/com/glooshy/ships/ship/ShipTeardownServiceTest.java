@@ -51,7 +51,7 @@ class ShipTeardownServiceTest {
      */
     @Test
     void teardown_removes_ship_from_registry() {
-        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
@@ -76,7 +76,7 @@ class ShipTeardownServiceTest {
      */
     @Test
     void teardown_releases_binding() {
-        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
@@ -96,7 +96,7 @@ class ShipTeardownServiceTest {
 
     @Test
     void teardown_works_for_hull_applied_phase() {
-        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
@@ -119,7 +119,7 @@ class ShipTeardownServiceTest {
      */
     @Test
     void teardown_throws_for_finalized_ship() {
-        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
@@ -135,7 +135,7 @@ class ShipTeardownServiceTest {
 
     @Test
     void teardown_throws_for_destroyed_ship() {
-        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
@@ -149,7 +149,7 @@ class ShipTeardownServiceTest {
 
     @Test
     void teardown_throws_for_unknown_ship() {
-        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid());
+        ShipRegistry ships = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
