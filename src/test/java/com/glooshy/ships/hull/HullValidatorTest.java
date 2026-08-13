@@ -9,8 +9,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Tests use {@link HullValidator#validateRules} (pure primitives) instead of
  * {@link HullValidator#validate(Material)} because org.bukkit.Material has a
- * static initializer that requires server context. The Material adapter is
- * verified in BUILD-SMOKE on a real server.
+ * static initializer that requires server context.
  *
  * <p>Named defect: DEFECT-07 (INVALID_MATERIAL_CONSUMED) — an invalid block
  * passes validation and is consumed as hull.
@@ -23,8 +22,7 @@ class HullValidatorTest {
      * FALSIFICATION_PROOF — DEFECT-07 (INVALID_MATERIAL_CONSUMED).
      *
      * <p>Mutation plan: replace validateRules body with {@code return HullValidationResult.valid();}
-     * Expected RED: every "rejects" test below fails because the validator accepts
-     * the invalid material.
+     * Expected RED: every "rejects" test below fails.
      */
     @Test
     void rejects_air() {
@@ -42,10 +40,12 @@ class HullValidatorTest {
     }
 
     @Test
-    void rejects_non_solid() {
+    void rejects_non_occluding() {
+        // Slabs, stairs, fences, glass, signs, plants, fluids all fail this check.
         HullValidationResult result = validator.validateRules(false, true, false, 5.0);
-        assertFalse(result.isValid(), "Non-solid blocks must be rejected");
-        assertTrue(result.errorMessage().contains("solid"));
+        assertFalse(result.isValid(), "Non-occluding blocks must be rejected (slabs, stairs, fences, glass, signs)");
+        assertTrue(result.errorMessage().contains("opaque"),
+                "Error message must mention 'opaque' so player understands what's required");
     }
 
     @Test
@@ -92,10 +92,6 @@ class HullValidatorTest {
                 "Error message must include threshold for context");
     }
 
-    /**
-     * Regression — record accessor renamed from {@code valid()} to {@code isValid()}
-     * to avoid name collision with the static factory.
-     */
     @Test
     void result_record_accessors_work() {
         HullValidationResult ok = HullValidationResult.valid();
