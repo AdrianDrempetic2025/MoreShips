@@ -75,7 +75,10 @@ public final class ShipRegistry {
                         "Invalid lifecycle transition: " + current.phase() + " → " + newPhase
                                 + " (allowed: " + LifecycleTransition.validTargets(current.phase()) + ")");
             }
-            if (newPhase == LifecyclePhase.REMOVED) {
+            if (newPhase == LifecyclePhase.REMOVED || newPhase == LifecyclePhase.DESTROYED) {
+                // Terminal "gone" states — delete the entry entirely so it no
+                // longer counts as live. Ship→wreck correlation in a future
+                // slice will use a separate wreck registry if needed.
                 return null;
             }
             return new Ship(key, newPhase, current.hullMaterial());

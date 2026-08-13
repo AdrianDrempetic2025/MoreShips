@@ -22,20 +22,24 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Listens for damage to the ArmorStand that represents a ship.
  *
- * <p>For ANY custom-ship entity, the damage event is cancelled — ships have
- * their own damage model (HP from the future combat slice), not vanilla
- * ArmorStand damage. Cancelling prevents the ArmorStand from being destroyed
- * by melee, explosions, fall, etc. — which would orphan the ship in the
- * registry (DEFECT-11: FINALIZED_SHIP_BREAKABLE_VIA_MELEE).
+ * <p>Two paths depending on ship phase:
  *
- * <p>If the damager is a player and the ship is in a teardownable phase
- * (UNFINISHED or HULL_APPLIED), the listener performs full teardown:
- * drops the Ship Core (and hull material if applied), transitions the ship
- * to REMOVED, releases the binding, and removes the entity.
+ * <p><b>Teardownable phases (UNFINISHED, HULL_APPLIED):</b> damage is cancelled
+ * unconditionally — pre-finalization ships cannot be killed by external damage
+ * (RQCA-21: inputs must be conserved via the explicit teardown flow, not lost
+ * to creeper explosions / fall / etc.). Player damage triggers the full
+ * teardown: drop core + hull, transition to REMOVED, release binding, remove
+ * entity. Non-player damage is just cancelled.
  *
- * <p>For FINALIZED / DESTROYED ships, the damage is cancelled but no teardown
- * occurs — those phases have their own removal paths (HP=0 → DESTROYED;
- * future slice).
+ * <p><b>FINALIZED phase:</b> damage is NOT cancelled. The ship has HP (a
+ * proper HP system is a future slice; for now ArmorStand HP), so it eventually
+ * dies from sustained damage. When the entity dies,
+ * {@link ShipEntityDeathListener} catches {@code EntityDeathEvent} and
+ * transitions the ship to DESTROYED + releases the binding.
+ *
+ * <p><b>DESTROYED phase:</b> the entity should already be gone; if damage
+ * reaches a DESTROYED-phase entity somehow, it's let through (entity will be
+ * removed naturally).
  */
 public final class ShipEntityBreakListener implements Listener {
 
@@ -66,35 +70,34 @@ public final class ShipEntityBreakListener implements Listener {
             return; // Not a custom ship — vanilla damage proceeds
         }
 
-        // Custom ship entity — ALWAYS cancel damage. The ship has its own
-        // damage model (HP from future combat slice). Vanilla ArmorStand
-        // damage is not the destruction path.
-        event.setCancelled(true);
-
         var shipId = binding.get().shipId();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {
-            // Orphan binding (ship was REMOVED but binding lingers) — release
+            // Orphan binding — release it
             bindingRegistry.release(shipId);
             return;
         }
         Ship ship = shipOpt.get();
 
-        // Only player damage triggers teardown consideration
+        if (!ShipTeardownService.isTeardownable(ship.phase())) {
+            // FINALIZED or DESTROYED — let damage proceed. Ship has HP (future
+            // proper combat slice; for now vanilla ArmorStand HP). When entity
+            // dies, the death listener cleans up.
+            return;
+        }
+
+        // Teardownable ship — cancel damage to keep the entity alive while we
+        // decide whether to tear down. RQCA-21 requires inputs to be conserved
+        // via the explicit teardown flow, not lost to ambient damage.
+        event.setCancelled(true);
+
         Player player = damagerAsPlayer(event);
         if (player == null) {
             return; // Non-player damage: just protect, no teardown
         }
 
-        if (!ShipTeardownService.isTeardownable(ship.phase())) {
-            // FINALIZED / DESTROYED — invincible to melee in V1
-            player.sendMessage(Component.text(
-                    "This ship cannot be damaged by melee.",
-                    NamedTextColor.GRAY));
-            return;
-        }
-
-        // Pre-finalization teardown — drop inputs BEFORE state mutation
+        // Drop inputs BEFORE mutating state — player keeps the inputs even if
+        // the subsequent service call somehow fails.
         stand.getWorld().dropItemNaturally(stand.getLocation(), shipCoreItem.create());
 
         Material hull = ship.hullMaterial();

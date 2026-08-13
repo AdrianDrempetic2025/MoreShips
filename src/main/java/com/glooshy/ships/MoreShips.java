@@ -8,6 +8,7 @@ import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.HullApplicationListener;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
 import com.glooshy.ships.listener.ShipEntityBreakListener;
+import com.glooshy.ships.listener.ShipEntityDeathListener;
 import com.glooshy.ships.persistence.BindingStore;
 import com.glooshy.ships.persistence.ShipStore;
 import com.glooshy.ships.persistence.YamlBindingStore;
@@ -77,6 +78,9 @@ public final class MoreShips extends JavaPlugin {
         ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
                 shipCoreItem, bindingRegistry, shipRegistry, teardownService);
         getServer().getPluginManager().registerEvents(breakListener, this);
+
+        ShipEntityDeathListener deathListener = new ShipEntityDeathListener(shipRegistry, bindingRegistry);
+        getServer().getPluginManager().registerEvents(deathListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
                 shipRegistry, bindingRegistry, hullValidator);
