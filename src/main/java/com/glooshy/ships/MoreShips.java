@@ -9,6 +9,8 @@ import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.HullApplicationListener;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
 import com.glooshy.ships.listener.ShipEntityBreakListener;
+import com.glooshy.ships.listener.ShipPilotListener;
+import com.glooshy.ships.movement.ShipMovementService;
 import com.glooshy.ships.persistence.BindingStore;
 import com.glooshy.ships.persistence.ShipStore;
 import com.glooshy.ships.persistence.YamlBindingStore;
@@ -36,6 +38,7 @@ public final class MoreShips extends JavaPlugin {
     private RuntimeBindingRegistry bindingRegistry;
     private ShipStore shipStore;
     private BindingStore bindingStore;
+    private ShipMovementService movementService;
 
     @Override
     public void onEnable() {
@@ -83,6 +86,24 @@ public final class MoreShips extends JavaPlugin {
                 shipRegistry, bindingRegistry, hullValidator);
         getServer().getPluginManager().registerEvents(hullListener, this);
 
+        if (config.movementEnabled()) {
+            getServer().getPluginManager().registerEvents(
+                    new ShipPilotListener(shipRegistry, bindingRegistry), this);
+            movementService = new ShipMovementService(
+                    this,
+                    shipRegistry,
+                    bindingRegistry,
+                    config.movementMaxSpeed(),
+                    config.movementAcceleration(),
+                    config.movementFriction());
+            movementService.start();
+            getLogger().info("Movement service started: maxSpeed=" + config.movementMaxSpeed()
+                    + " accel=" + config.movementAcceleration()
+                    + " friction=" + config.movementFriction());
+        } else {
+            getLogger().info("Movement disabled in config.");
+        }
+
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, shipRegistry, bindingRegistry, placementListener);
         PluginCommand command = getCommand("moreships");
@@ -93,11 +114,14 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-05). Persistence loaded.");
+        getLogger().info("MoreShips enabled (BUILD-07). Persistence + movement loaded.");
     }
 
     @Override
     public void onDisable() {
+        if (movementService != null) {
+            movementService.stop();
+        }
         savePersistedState();
         getLogger().info("MoreShips disabled.");
     }

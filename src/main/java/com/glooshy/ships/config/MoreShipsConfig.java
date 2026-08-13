@@ -67,4 +67,20 @@ public final class MoreShipsConfig {
     public double hpMultiplier() {
         return config.getDouble("hp.multiplier", 10.0);
     }
+
+    public boolean movementEnabled() {
+        return config.getBoolean("movement.enabled", true);
+    }
+
+    public double movementMaxSpeed() {
+        return config.getDouble("movement.maxSpeed", 0.4);
+    }
+
+    public double movementAcceleration() {
+        return config.getDouble("movement.acceleration", 0.02);
+    }
+
+    public double movementFriction() {
+        return config.getDouble("movement.friction", 0.05);
+    }
 }

@@ -33,3 +33,19 @@ hp:
   # Default 10 → stone (1.5) = 15 HP, obsidian (50) = 500 HP, planks (2) = 20.
   # Future slice adds core-size modifier and module HP changes per L1 spec.
   multiplier: 10.0
+
+movement:
+  # Master switch. When false, ships sit still even if piloted.
+  enabled: true
+  # Max forward speed in blocks per tick (20 ticks = 1 second).
+  # Default 0.4 = 8 blocks/sec, comparable to a vanilla boat.
+  # Set to 0 to effectively disable movement while keeping the pilot UI.
+  maxSpeed: 0.4
+  # Acceleration in blocks per tick². Applied each tick while piloted until
+  # currentSpeed reaches maxSpeed. Default 0.02 → takes 20 ticks (1s) to reach
+  # max speed from standstill (RQCA-14: speed at t≈0 ≠ max speed).
+  acceleration: 0.02
+  # Deceleration in blocks per tick² when no pilot is aboard (friction /
+  # water drag). Default 0.05 → ship drifts to a stop in 8 ticks (~0.4s)
+  # after the pilot dismounts.
+  friction: 0.05
