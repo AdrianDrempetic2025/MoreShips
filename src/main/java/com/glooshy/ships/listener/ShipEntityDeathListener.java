@@ -6,8 +6,11 @@ import com.glooshy.ships.ship.LifecyclePhase;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
 import java.util.Optional;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -18,13 +21,17 @@ import org.jetbrains.annotations.NotNull;
  * entity dies (HP reaches 0 via sustained damage), the ship transitions to
  * DESTROYED — which deletes it from the registry and releases the binding.
  *
- * <p>This is the cleanup path that was missing in BUILD-05b's first attempt.
- * Without it, the entity disappeared but the ship stayed in the registry
- * (orphan counter bug).
+ * <p>Per spec (raw §52, §55), destroyed ships become a wreck entity (future
+ * slice). For V1 without wrecks:
+ * <ul>
+ *   <li>hull material is NOT dropped — it's part of the ship's matter, not
+ *       recoverable loot. Modules and cargo will eventually route through
+ *       the wreck (probabilistic for modules, 100% for cargo per RQCA-22).</li>
+ *   <li>the entity just disappears; ship state transitions to DESTROYED.</li>
+ * </ul>
  *
  * <p>Pre-finalization ships do NOT reach this listener because
- * {@link ShipEntityBreakListener} cancels their damage. So this listener only
- * fires meaningfully for FINALIZED ships.
+ * {@link ShipEntityBreakListener} cancels their damage.
  */
 public final class ShipEntityDeathListener implements Listener {
 
@@ -53,7 +60,6 @@ public final class ShipEntityDeathListener implements Listener {
         var shipId = binding.get().shipId();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {
-            // Ship already gone (race or prior cleanup) — release lingering binding
             bindingRegistry.release(shipId);
             return;
         }
@@ -61,9 +67,13 @@ public final class ShipEntityDeathListener implements Listener {
 
         if (ship.phase() != LifecyclePhase.FINALIZED) {
             // Pre-finalization ships shouldn't reach here (damage was cancelled).
-            // If they do somehow, leave them alone — defense in depth.
             return;
         }
+
+        // Hull material is part of the ship — not dropped on destruction.
+        // Future wreck slice routes modules (probabilistic) + cargo (100% via
+        // physical inventories at the wreck).
+        event.getDrops().clear();
 
         try {
             shipRegistry.transition(shipId, LifecyclePhase.DESTROYED);
@@ -71,5 +81,12 @@ public final class ShipEntityDeathListener implements Listener {
             // Race or already destroyed — best-effort cleanup
         }
         bindingRegistry.release(shipId);
+
+        Player killer = ((ArmorStand) entity).getKiller();
+        if (killer != null) {
+            killer.sendMessage(Component.text(
+                    "Ship " + ship.identity().encoded() + " destroyed.",
+                    NamedTextColor.RED));
+        }
     }
 }
