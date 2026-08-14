@@ -4,6 +4,7 @@ import com.glooshy.ships.cargo.CargoService;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
+import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.ship.LifecyclePhase;
@@ -48,19 +49,22 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
     private final RuntimeBindingRegistry bindingRegistry;
     private final ShipCorePlacementListener placementListener;
     private final CargoService cargoService;
+    private final ModuleEntityManager moduleEntities;
 
     public ShipsCommand(ShipCoreItem shipCoreItem,
                         ModuleItem moduleItem,
                         ShipRegistry shipRegistry,
                         RuntimeBindingRegistry bindingRegistry,
                         ShipCorePlacementListener placementListener,
-                        CargoService cargoService) {
+                        CargoService cargoService,
+                        ModuleEntityManager moduleEntities) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
         this.placementListener = placementListener;
         this.cargoService = cargoService;
+        this.moduleEntities = moduleEntities;
     }
 
     @Override
@@ -144,7 +148,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             } catch (IllegalArgumentException e) {
                 sender.sendMessage(Component.text(
                         "Unknown module type: " + args[1]
-                                + " (helmet, seat, cargo, cannon, or core)", NamedTextColor.RED));
+                                + " (seat, cargo, cannon, or core)", NamedTextColor.RED));
                 return;
             }
             player.getInventory().addItem(moduleItem.create(type));
@@ -218,8 +222,8 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                     return;
                 }
                 shipRegistry.removeModule(shipId, slot);
+                moduleEntities.despawn(shipId, slot);
                 if (target instanceof ArmorStand stand) {
-                    stand.getEquipment().setItem(slot.equipmentSlot(), null);
                     stand.getWorld().dropItemNaturally(
                             stand.getLocation(), moduleItem.create(removed));
                 }
@@ -244,16 +248,15 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                             NamedTextColor.RED));
                     return;
                 }
+                Ship updatedShip;
                 try {
-                    shipRegistry.moveModule(shipId, from, to);
+                    updatedShip = shipRegistry.moveModule(shipId, from, to);
                 } catch (IllegalStateException e) {
                     player.sendMessage(Component.text(e.getMessage(), NamedTextColor.RED));
                     return;
                 }
-                if (target instanceof ArmorStand stand) {
-                    stand.getEquipment().setItem(from.equipmentSlot(), null);
-                    stand.getEquipment().setItem(to.equipmentSlot(), moduleItem.create(moved));
-                }
+                moduleEntities.despawn(shipId, from);
+                moduleEntities.spawn(updatedShip, to);
                 player.sendMessage(Component.text(
                         "Moved " + moduleItem.displayName(moved) + ": "
                                 + from.name().toLowerCase() + " → " + to.name().toLowerCase(),
@@ -408,7 +411,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("/moreships give [type]", NamedTextColor.AQUA)
-                .append(Component.text(" — receive a Ship Core or module (helm/seat/cargo/cannon)", NamedTextColor.GRAY)));
+                .append(Component.text(" — receive a Ship Core or module (seat/cargo/cannon)", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships info", NamedTextColor.AQUA)
                 .append(Component.text(" — show live ship + binding counts", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships finalize", NamedTextColor.AQUA)
@@ -416,7 +419,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/moreships module list", NamedTextColor.AQUA)
                 .append(Component.text(" — list modules on the ship you are looking at", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships module remove <slot>", NamedTextColor.AQUA)
-                .append(Component.text(" — remove a module (bow/stern/port/starboard), drops the item", NamedTextColor.GRAY)));
+                .append(Component.text(" — admin: remove a module, drops the item (punching the module works too)", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships module move <from> <to>", NamedTextColor.AQUA)
                 .append(Component.text(" — move a module to another slot", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships cargo", NamedTextColor.AQUA)

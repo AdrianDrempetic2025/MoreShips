@@ -2,6 +2,7 @@ package com.glooshy.ships.listener;
 
 import com.glooshy.ships.cargo.CargoService;
 import com.glooshy.ships.item.ModuleItem;
+import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
@@ -57,17 +58,20 @@ public final class ShipEntityBreakListener implements Listener {
     private final ShipTeardownService teardownService;
     private final ModuleItem moduleItem;
     private final CargoService cargoService;
+    private final ModuleEntityManager moduleEntities;
 
     public ShipEntityBreakListener(
             ShipCoreItem shipCoreItem,
             ModuleItem moduleItem,
             CargoService cargoService,
+            ModuleEntityManager moduleEntities,
             RuntimeBindingRegistry bindingRegistry,
             ShipRegistry shipRegistry,
             ShipTeardownService teardownService) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.cargoService = cargoService;
+        this.moduleEntities = moduleEntities;
         this.bindingRegistry = bindingRegistry;
         this.shipRegistry = shipRegistry;
         this.teardownService = teardownService;
@@ -122,6 +126,7 @@ public final class ShipEntityBreakListener implements Listener {
 
         dropModules(stand, ship);
         dropCargo(stand, ship);
+        moduleEntities.despawnAll(ship.identity());
 
         teardownService.teardown(ship.identity());
         stand.remove();
@@ -144,6 +149,7 @@ public final class ShipEntityBreakListener implements Listener {
             String id = ship.identity().encoded();
             dropModules(stand, after);
             dropCargo(stand, after);
+            moduleEntities.despawnAll(ship.identity());
             try {
                 shipRegistry.transition(ship.identity(), LifecyclePhase.DESTROYED);
             } catch (IllegalStateException ignored) {

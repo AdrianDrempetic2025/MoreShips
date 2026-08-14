@@ -88,7 +88,6 @@ public final class MoreShipsConfig {
     }
 
     private static final Map<ModuleType, Material> DEFAULT_MODULE_MATERIALS = Map.of(
-            ModuleType.HELM, Material.COMPASS,
             ModuleType.SEAT, Material.OAK_STAIRS,
             ModuleType.CARGO, Material.CHEST,
             ModuleType.CANNON, Material.DISPENSER);

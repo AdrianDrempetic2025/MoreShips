@@ -1,6 +1,7 @@
 package com.glooshy.ships.listener;
 
 import com.glooshy.ships.item.ModuleItem;
+import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.ship.LifecyclePhase;
@@ -24,7 +25,8 @@ import org.jetbrains.annotations.NotNull;
  *
  * <p>Right-click the ship's ArmorStand with a module item in hand → the module
  * is consumed and fitted into the first free slot (BOW, STERN, PORT,
- * STARBOARD), rendered at that slot's equipment position on the entity.
+ * STARBOARD). The module then exists as its own entity at that slot's position
+ * around the ship (own hitbox, own interactions — see ModuleEntityListener).
  * Wrong-phase clicks get a player-facing refusal; a full ship refuses without
  * consuming the item.
  *
@@ -39,14 +41,17 @@ public final class ModuleInstallListener implements Listener {
     private final ShipRegistry shipRegistry;
     private final RuntimeBindingRegistry bindingRegistry;
     private final ModuleItem moduleItem;
+    private final ModuleEntityManager moduleEntities;
 
     public ModuleInstallListener(
             ShipRegistry shipRegistry,
             RuntimeBindingRegistry bindingRegistry,
-            ModuleItem moduleItem) {
+            ModuleItem moduleItem,
+            ModuleEntityManager moduleEntities) {
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
         this.moduleItem = moduleItem;
+        this.moduleEntities = moduleEntities;
     }
 
     @EventHandler
@@ -96,7 +101,7 @@ public final class ModuleInstallListener implements Listener {
 
         inHand.setAmount(inHand.getAmount() - 1);
 
-        stand.getEquipment().setItem(slot.equipmentSlot(), moduleItem.create(type));
+        moduleEntities.spawn(updated, slot);
 
         player.sendMessage(Component.text(
                 "Installed " + moduleItem.displayName(type) + " in slot " + slot.name()

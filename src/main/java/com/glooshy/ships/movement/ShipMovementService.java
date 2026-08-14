@@ -1,6 +1,7 @@
 package com.glooshy.ships.movement;
 
 import com.glooshy.ships.identity.ShipIdentity;
+import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.ship.LifecyclePhase;
@@ -58,6 +59,7 @@ public final class ShipMovementService implements Runnable {
     private final JavaPlugin plugin;
     private final ShipRegistry shipRegistry;
     private final RuntimeBindingRegistry bindingRegistry;
+    private final ModuleEntityManager moduleEntities;
     private final double maxSpeed;
     private final double acceleration;
     private final double friction;
@@ -69,12 +71,14 @@ public final class ShipMovementService implements Runnable {
             @NotNull JavaPlugin plugin,
             @NotNull ShipRegistry shipRegistry,
             @NotNull RuntimeBindingRegistry bindingRegistry,
+            @NotNull ModuleEntityManager moduleEntities,
             double maxSpeed,
             double acceleration,
             double friction) {
         this.plugin = plugin;
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
+        this.moduleEntities = moduleEntities;
         this.maxSpeed = maxSpeed;
         this.acceleration = acceleration;
         this.friction = friction;
@@ -118,6 +122,11 @@ public final class ShipMovementService implements Runnable {
             if (ship.phase() != LifecyclePhase.FINALIZED) {
                 // Non-finalized ships don't move. Drop cache entry to bound memory.
                 movements.remove(shipId);
+                if (ship.phase() == LifecyclePhase.HULL_APPLIED) {
+                    // Module entities must exist (and self-heal) pre-finalization
+                    // too — ships in configuration carry modules around.
+                    moduleEntities.follow(shipId);
+                }
                 continue;
             }
 
@@ -140,6 +149,10 @@ public final class ShipMovementService implements Runnable {
 
             movement.tick();
             applyMovement(entity, movement);
+
+            // Module entities hold their slot positions — follow position AND
+            // rotation, even when stationary (center-turn in place)
+            moduleEntities.follow(shipId);
         }
     }
 

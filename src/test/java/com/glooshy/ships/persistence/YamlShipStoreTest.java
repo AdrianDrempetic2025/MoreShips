@@ -166,7 +166,7 @@ class YamlShipStoreTest {
                 -1,
                 java.util.Map.of(
                         com.glooshy.ships.ship.ModuleSlot.BOW, com.glooshy.ships.ship.ModuleType.CANNON,
-                        com.glooshy.ships.ship.ModuleSlot.STARBOARD, com.glooshy.ships.ship.ModuleType.HELM));
+                        com.glooshy.ships.ship.ModuleSlot.STARBOARD, com.glooshy.ships.ship.ModuleType.SEAT));
 
         store.save(List.of(ship));
 
@@ -178,7 +178,7 @@ class YamlShipStoreTest {
                 "Fitted modules must survive the save/load round-trip");
         assertEquals(com.glooshy.ships.ship.ModuleType.CANNON,
                 restored.modules().get(com.glooshy.ships.ship.ModuleSlot.BOW));
-        assertEquals(com.glooshy.ships.ship.ModuleType.HELM,
+        assertEquals(com.glooshy.ships.ship.ModuleType.SEAT,
                 restored.modules().get(com.glooshy.ships.ship.ModuleSlot.STARBOARD));
     }
 

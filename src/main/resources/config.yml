@@ -54,9 +54,6 @@ modules:
   # Base vanilla material per module type (RQCA-08). The PersistentDataContainer
   # marker — not the material — identifies a real module item, so a vanilla
   # chest in hand never installs a cargo module.
-  helm:
-    material: COMPASS
-    displayName: "Helm Module"
   seat:
     material: OAK_STAIRS
     displayName: "Seat Module"

@@ -10,15 +10,19 @@ import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.CargoInventoryListener;
 import com.glooshy.ships.listener.HullApplicationListener;
+import com.glooshy.ships.listener.ModuleEntityListener;
 import com.glooshy.ships.listener.ModuleInstallListener;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
 import com.glooshy.ships.listener.ShipEntityBreakListener;
 import com.glooshy.ships.listener.ShipPilotListener;
 import com.glooshy.ships.movement.ShipMovementService;
 import com.glooshy.ships.persistence.BindingStore;
+import com.glooshy.ships.persistence.ModuleEntityStore;
 import com.glooshy.ships.persistence.ShipStore;
 import com.glooshy.ships.persistence.YamlBindingStore;
+import com.glooshy.ships.persistence.YamlModuleEntityStore;
 import com.glooshy.ships.persistence.YamlShipStore;
+import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ShipEntitySpawner;
 import com.glooshy.ships.ship.Ship;
@@ -42,6 +46,8 @@ public final class MoreShips extends JavaPlugin {
     private RuntimeBindingRegistry bindingRegistry;
     private ShipStore shipStore;
     private BindingStore bindingStore;
+    private ModuleEntityStore moduleEntityStore;
+    private ModuleEntityManager moduleEntities;
     private ShipMovementService movementService;
 
     @Override
@@ -52,10 +58,12 @@ public final class MoreShips extends JavaPlugin {
         NamespacedKey shipCoreMarker = new NamespacedKey(this, "ship_core_marker");
         NamespacedKey moduleMarker = new NamespacedKey(this, "module_marker");
         NamespacedKey shipIdKey = new NamespacedKey(this, "ship_id");
+        NamespacedKey moduleSlotKey = new NamespacedKey(this, "module_slot");
 
         Path dataFolder = getDataFolder().toPath();
         shipStore = new YamlShipStore(dataFolder.resolve("ships.yml"));
         bindingStore = new YamlBindingStore(dataFolder.resolve("bindings.yml"));
+        moduleEntityStore = new YamlModuleEntityStore(dataFolder.resolve("module-entities.yml"));
 
         ShipCoreItem shipCoreItem = new ShipCoreItem(
                 shipCoreMarker,
@@ -71,6 +79,8 @@ public final class MoreShips extends JavaPlugin {
         ShipTeardownService teardownService = new ShipTeardownService(shipRegistry, bindingRegistry);
         HullValidator hullValidator = new HullValidator(config.hullMinHardness());
         CargoService cargoService = new CargoService(shipRegistry);
+        moduleEntities = new ModuleEntityManager(
+                shipIdKey, moduleSlotKey, shipRegistry, bindingRegistry, moduleItem);
 
         // Load persisted state before listeners attach
         loadPersistedState();
@@ -89,7 +99,8 @@ public final class MoreShips extends JavaPlugin {
         getServer().getPluginManager().registerEvents(placementListener, this);
 
         ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
-                shipCoreItem, moduleItem, cargoService, bindingRegistry, shipRegistry, teardownService);
+                shipCoreItem, moduleItem, cargoService, moduleEntities,
+                bindingRegistry, shipRegistry, teardownService);
         getServer().getPluginManager().registerEvents(breakListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
@@ -97,8 +108,11 @@ public final class MoreShips extends JavaPlugin {
         getServer().getPluginManager().registerEvents(hullListener, this);
 
         ModuleInstallListener moduleListener = new ModuleInstallListener(
-                shipRegistry, bindingRegistry, moduleItem);
+                shipRegistry, bindingRegistry, moduleItem, moduleEntities);
         getServer().getPluginManager().registerEvents(moduleListener, this);
+
+        getServer().getPluginManager().registerEvents(
+                new ModuleEntityListener(moduleEntities, shipRegistry, cargoService, moduleItem), this);
 
         getServer().getPluginManager().registerEvents(
                 new CargoInventoryListener(cargoService), this);
@@ -110,6 +124,7 @@ public final class MoreShips extends JavaPlugin {
                     this,
                     shipRegistry,
                     bindingRegistry,
+                    moduleEntities,
                     config.movementMaxSpeed(),
                     config.movementAcceleration(),
                     config.movementFriction());
@@ -123,7 +138,7 @@ public final class MoreShips extends JavaPlugin {
 
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener,
-                cargoService);
+                cargoService, moduleEntities);
         PluginCommand command = getCommand("moreships");
         if (command != null) {
             command.setExecutor(shipsCommand);
@@ -132,7 +147,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-09). Persistence + movement + modules + cargo loaded.");
+        getLogger().info("MoreShips enabled (BUILD-10). Module entities (own hitboxes) loaded.");
     }
 
     @Override
@@ -159,6 +174,13 @@ public final class MoreShips extends JavaPlugin {
         } catch (IOException e) {
             getLogger().warning("Failed to load bindings.yml: " + e.getMessage());
         }
+        try {
+            var moduleEntityBindings = moduleEntityStore.load();
+            moduleEntities.load(moduleEntityBindings);
+            getLogger().info("Loaded " + moduleEntityBindings.size() + " module entities from disk.");
+        } catch (IOException e) {
+            getLogger().warning("Failed to load module-entities.yml: " + e.getMessage());
+        }
     }
 
     private void savePersistedState() {
@@ -175,6 +197,13 @@ public final class MoreShips extends JavaPlugin {
             getLogger().info("Saved " + bindings.size() + " bindings to disk.");
         } catch (IOException e) {
             getLogger().severe("Failed to save bindings.yml: " + e.getMessage());
+        }
+        try {
+            var moduleEntityBindings = moduleEntities.snapshot();
+            moduleEntityStore.save(moduleEntityBindings);
+            getLogger().info("Saved " + moduleEntityBindings.size() + " module entities to disk.");
+        } catch (IOException e) {
+            getLogger().severe("Failed to save module-entities.yml: " + e.getMessage());
         }
     }
 }

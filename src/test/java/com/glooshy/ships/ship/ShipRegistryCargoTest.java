@@ -89,7 +89,7 @@ class ShipRegistryCargoTest {
         Map<Integer, Map<String, Object>> cargo = Map.of(1, Map.of("type", "IRON_INGOT"));
         registry.setCargo(ship.identity(), cargo);
 
-        registry.installModule(ship.identity(), ModuleType.HELM, ModuleSlot.STERN);
+        registry.installModule(ship.identity(), ModuleType.CANNON, ModuleSlot.STERN);
         registry.moveModule(ship.identity(), ModuleSlot.BOW, ModuleSlot.PORT);
         Ship after = registry.removeModule(ship.identity(), ModuleSlot.PORT);
 

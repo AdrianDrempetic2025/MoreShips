@@ -44,11 +44,11 @@ class ShipRegistryModuleTest {
         registry.installModule(ship.identity(), ModuleType.CANNON, ModuleSlot.BOW);
         registry.installModule(ship.identity(), ModuleType.CANNON, ModuleSlot.STERN);
         registry.installModule(ship.identity(), ModuleType.SEAT, ModuleSlot.PORT);
-        registry.installModule(ship.identity(), ModuleType.HELM, ModuleSlot.STARBOARD);
+        registry.installModule(ship.identity(), ModuleType.CANNON, ModuleSlot.STARBOARD);
 
         Ship fromRegistry = registry.find(ship.identity()).orElseThrow();
         assertEquals(4, fromRegistry.modules().size());
-        assertEquals(ModuleType.HELM, fromRegistry.modules().get(ModuleSlot.STARBOARD));
+        assertEquals(ModuleType.CANNON, fromRegistry.modules().get(ModuleSlot.STARBOARD));
     }
 
     @Test
@@ -162,12 +162,12 @@ class ShipRegistryModuleTest {
         ShipRegistry registry = newRegistry();
         Ship ship = newHullAppliedShip(registry);
         registry.installModule(ship.identity(), ModuleType.CARGO, ModuleSlot.BOW);
-        registry.installModule(ship.identity(), ModuleType.HELM, ModuleSlot.STARBOARD);
+        registry.installModule(ship.identity(), ModuleType.SEAT, ModuleSlot.STARBOARD);
 
         Ship finalized = registry.transition(ship.identity(), LifecyclePhase.FINALIZED);
 
         assertEquals(2, finalized.modules().size());
-        assertEquals(ModuleType.HELM, finalized.modules().get(ModuleSlot.STARBOARD));
+        assertEquals(ModuleType.SEAT, finalized.modules().get(ModuleSlot.STARBOARD));
     }
 
     @Test
