@@ -105,11 +105,23 @@ public final class CustomModelVisualManager {
             List<HullCube> cubes = new ArrayList<>();
             for (JsonElement el : root.getAsJsonArray("elements")) {
                 JsonObject cube = el.getAsJsonObject();
+                // Blockbench omits "angle" when it is 0 — treat missing as 0,
+                // a hard .get("angle") NPEd here and silently killed the whole
+                // model load (specs stayed empty, nothing ever spawned)
+                double angle = 0;
+                double[] rotOrigin = {8, 8, 8};
+                if (cube.has("rotation")) {
+                    JsonObject rot = cube.getAsJsonObject("rotation");
+                    if (rot.has("angle")) {
+                        angle = rot.get("angle").getAsDouble();
+                    }
+                    if (rot.has("origin")) {
+                        rotOrigin = px(rot.getAsJsonArray("origin"));
+                    }
+                }
                 cubes.add(new HullCube(
                         px(cube.getAsJsonArray("from")), px(cube.getAsJsonArray("to")),
-                        cube.has("rotation") ? cube.getAsJsonObject("rotation").get("angle").getAsDouble() : 0,
-                        cube.has("rotation") ? px(cube.getAsJsonObject("rotation").getAsJsonArray("origin"))
-                                : new double[] {8, 8, 8}));
+                        angle, rotOrigin));
             }
             models.put(size, new ModelSpec(cubes,
                     new NamespacedKey("moreships", trimItemModel)));
