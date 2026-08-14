@@ -23,7 +23,7 @@ public final class ShipStats {
         double boost = engineCount * engineBoost;
         double hardness = hullHardness * hardnessPenalty;
         double multiplier = 1.0 - weight + boost - hardness;
-        return Math.max(0.4, Math.min(1.6, multiplier));
+        return Math.max(0.3, Math.min(2.0, multiplier));
     }
 
     public static int bonusMaxHp(int healthModules, int healthBonusPerModule) {

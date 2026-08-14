@@ -400,21 +400,11 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleRecipes(CommandSender sender) {
-        sender.sendMessage(Component.text("=== MoreShips Recipes ===", NamedTextColor.GOLD));
-        sender.sendMessage(Component.text("Cores:", NamedTextColor.AQUA));
-        sender.sendMessage(Component.text("  Small Ship Core  = [iron] [stick] [iron] (row)", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("  Medium Ship Core = planks+iron around 3 SMALL CORES", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("  Large Ship Core  = [medium core] [medium core] [stick] (row)", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("Modules:", NamedTextColor.AQUA));
-        sender.sendMessage(Component.text("  Seat Module   = 3 oak planks (row)", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("  Cargo Module  = 8 oak planks around a CHEST", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("  Cannon Module = 8 iron ingots around a FIRE CHARGE", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("  Engine Module = [iron] [redstone] [iron] (row)", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("  Health Module = 8 iron ingots around a GOLDEN APPLE", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("Tips:", NamedTextColor.AQUA));
-        sender.sendMessage(Component.text("  Core ingredients must be REAL crafted cores (PDC marked).", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("  Engines: +15% max speed each. Health: +10 max HP each.", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("  Every module adds weight (-5% speed); hard hulls are slower.", NamedTextColor.GRAY));
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can open the recipe book.", NamedTextColor.RED));
+            return;
+        }
+        new com.glooshy.ships.ui.RecipeBookUi(shipCoreItem, moduleItem).open(player, 0);
     }
 
     private void handleDebug(CommandSender sender) {

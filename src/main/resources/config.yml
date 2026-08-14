@@ -119,9 +119,9 @@ stats:
   # Module-driven statistics (CON-10/11, RQCA-07).
   # Speed multiplier per ship = 1 - modules*weight + engines*boost - hardness*penalty
   # (clamped 0.4..1.6). Health modules add healthBonus max HP each.
-  weightPerModule: 0.05
-  engineBoost: 0.15
-  hardnessPenalty: 0.002
+  weightPerModule: 0.08
+  engineBoost: 0.25
+  hardnessPenalty: 0.006
   healthBonus: 10
 
 modules:

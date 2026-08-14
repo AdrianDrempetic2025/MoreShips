@@ -148,15 +148,15 @@ public final class MoreShipsConfig {
     }
 
     public double statsWeightPerModule() {
-        return config.getDouble("stats.weightPerModule", 0.05);
+        return config.getDouble("stats.weightPerModule", 0.08);
     }
 
     public double statsEngineBoost() {
-        return config.getDouble("stats.engineBoost", 0.15);
+        return config.getDouble("stats.engineBoost", 0.25);
     }
 
     public double statsHardnessPenalty() {
-        return config.getDouble("stats.hardnessPenalty", 0.002);
+        return config.getDouble("stats.hardnessPenalty", 0.006);
     }
 
     public int statsHealthBonus() {

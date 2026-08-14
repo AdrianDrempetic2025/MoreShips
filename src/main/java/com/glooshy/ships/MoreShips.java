@@ -142,6 +142,9 @@ public final class MoreShips extends JavaPlugin {
                 new com.glooshy.ships.listener.CannonHitListener(cannonService, resolver), this);
 
         getServer().getPluginManager().registerEvents(
+                new com.glooshy.ships.listener.RecipeBookListener(shipCoreItem, moduleItem), this);
+
+        getServer().getPluginManager().registerEvents(
                 new CargoInventoryListener(cargoService), this);
 
         String packUrl = config.resourcePackUrl();
@@ -199,7 +202,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-32). Module stats + engine/health modules.");
+        getLogger().info("MoreShips enabled (BUILD-33). Recipe book UI + stronger stat spread.");
     }
 
     @Override
