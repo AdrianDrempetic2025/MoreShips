@@ -4,6 +4,7 @@ import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ModuleEntityManager;
+import com.glooshy.ships.runtime.HullVisualManager;
 import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.ship.LifecyclePhase;
 import com.glooshy.ships.ship.Ship;
@@ -61,6 +62,7 @@ public final class ShipMovementService implements Runnable {
     private final RuntimeBindingRegistry bindingRegistry;
     private final ModuleEntityManager moduleEntities;
     private final ShipHitboxManager hitboxes;
+    private final HullVisualManager hullVisuals;
     private final org.bukkit.NamespacedKey shipIdKey;
     private final WaterPhysics waterPhysics;
     private final boolean collisionEnabled;
@@ -80,6 +82,7 @@ public final class ShipMovementService implements Runnable {
             @NotNull RuntimeBindingRegistry bindingRegistry,
             @NotNull ModuleEntityManager moduleEntities,
             @NotNull ShipHitboxManager hitboxes,
+            @NotNull HullVisualManager hullVisuals,
             @NotNull org.bukkit.NamespacedKey shipIdKey,
             double maxSpeed,
             boolean collisionEnabled,
@@ -94,6 +97,7 @@ public final class ShipMovementService implements Runnable {
         this.bindingRegistry = bindingRegistry;
         this.moduleEntities = moduleEntities;
         this.hitboxes = hitboxes;
+        this.hullVisuals = hullVisuals;
         this.shipIdKey = shipIdKey;
         this.maxSpeed = maxSpeed;
         this.acceleration = acceleration;
@@ -173,9 +177,10 @@ public final class ShipMovementService implements Runnable {
                 applyVelocity(entity, ship, 0.0);
             }
 
-            // Module entities hold their slot positions; hitbox rides along.
+            // Module entities hold their slot positions; hitbox + hull visuals ride along.
             moduleEntities.follow(shipId);
             hitboxes.follow(shipId);
+            hullVisuals.follow(shipId);
         }
     }
 
