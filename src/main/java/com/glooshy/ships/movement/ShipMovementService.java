@@ -186,14 +186,17 @@ public final class ShipMovementService implements Runnable {
             }
 
             if (ship.phase() == LifecyclePhase.FINALIZED) {
-                // CON-10/11 + RQCA-07: module weight slows, engines boost,
-                // harder hulls are tougher but slower
-                double effectiveMax = maxSpeed * com.glooshy.ships.ship.ShipStats.speedMultiplier(
-                        ship.modules().size(),
-                        com.glooshy.ships.ship.ShipStats.countType(ship.modules(),
-                                com.glooshy.ships.ship.ModuleType.ENGINE),
+                // CON-10/11 + RQCA-07: module weight slows, harder hulls are
+                // slower. Engines raise the CEILING directly (1 + boost per
+                // engine on top of the base), so a 2-engine ship genuinely
+                // tops out faster, not just accelerates faster.
+                int engineCount = com.glooshy.ships.ship.ShipStats.countType(
+                        ship.modules(), com.glooshy.ships.ship.ModuleType.ENGINE);
+                double multiplier = com.glooshy.ships.ship.ShipStats.speedMultiplier(
+                        ship.modules().size(), 0,
                         ship.hullMaterial() != null ? ship.hullMaterial().getHardness() : 0.0,
-                        weightPerModule, engineBoost, hardnessPenalty);
+                        weightPerModule, 0.0, hardnessPenalty);
+                double effectiveMax = maxSpeed * multiplier * (1.0 + engineCount * engineBoost);
                 ShipMovement movement = movements.computeIfAbsent(
                         shipId, k -> new ShipMovement(effectiveMax, acceleration, friction));
                 movement.setMaxSpeed(effectiveMax);

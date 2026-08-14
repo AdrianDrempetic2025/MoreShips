@@ -41,7 +41,7 @@ import org.jetbrains.annotations.Nullable;
 public final class ShipsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("give", "info", "finalize", "module", "cargo", "debug", "reload", "help");
+            List.of("give", "info", "finalize", "module", "cargo", "debug", "reload", "recipes", "help");
 
     private static final List<String> MODULE_SUBCOMMANDS = List.of("list", "remove", "move");
 
@@ -100,6 +100,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                         "MoreShips config reloaded. Some values (recipes, item "
                                 + "materials) need a full restart.", NamedTextColor.GREEN));
             }
+            case "recipes" -> handleRecipes(sender);
             case "help" -> sendHelp(sender);
             default -> sender.sendMessage(Component.text(
                     "Unknown subcommand: " + args[0], NamedTextColor.RED));
@@ -396,6 +397,24 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             case REMOVED -> "Ship is removed.";
             default -> "Ship cannot be finalized in phase " + phase + ".";
         };
+    }
+
+    private void handleRecipes(CommandSender sender) {
+        sender.sendMessage(Component.text("=== MoreShips Recipes ===", NamedTextColor.GOLD));
+        sender.sendMessage(Component.text("Cores:", NamedTextColor.AQUA));
+        sender.sendMessage(Component.text("  Small Ship Core  = [iron] [stick] [iron] (row)", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  Medium Ship Core = planks+iron around 3 SMALL CORES", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  Large Ship Core  = [medium core] [medium core] [stick] (row)", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("Modules:", NamedTextColor.AQUA));
+        sender.sendMessage(Component.text("  Seat Module   = 3 oak planks (row)", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  Cargo Module  = 8 oak planks around a CHEST", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  Cannon Module = 8 iron ingots around a FIRE CHARGE", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  Engine Module = [iron] [redstone] [iron] (row)", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  Health Module = 8 iron ingots around a GOLDEN APPLE", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("Tips:", NamedTextColor.AQUA));
+        sender.sendMessage(Component.text("  Core ingredients must be REAL crafted cores (PDC marked).", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  Engines: +15% max speed each. Health: +10 max HP each.", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  Every module adds weight (-5% speed); hard hulls are slower.", NamedTextColor.GRAY));
     }
 
     private void handleDebug(CommandSender sender) {

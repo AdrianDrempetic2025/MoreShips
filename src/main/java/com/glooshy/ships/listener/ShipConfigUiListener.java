@@ -138,7 +138,14 @@ public final class ShipConfigUiListener implements Listener {
             try {
                 Ship updated = shipRegistry.installModule(ship.identity(), held, pos);
                 moduleEntities.spawn(updated, pos);
-                event.getView().setCursor(null);
+                // Consume exactly ONE module; the rest of the stack stays on
+                // the cursor (the old setCursor(null) ate the whole stack)
+                if (cursor.getAmount() > 1) {
+                    cursor.setAmount(cursor.getAmount() - 1);
+                    event.getView().setCursor(cursor);
+                } else {
+                    event.getView().setCursor(null);
+                }
                 event.getInventory().setItem(
                         ConfigUiLayout.indexOf(ship.size(), pos), moduleItem.create(held));
                 player.sendMessage(Component.text(
