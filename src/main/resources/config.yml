@@ -92,3 +92,8 @@ collision:
   # The collision box is the hitbox shrunk by this margin on each side, so a
   # ship fits into an appropriately sized dock without pixel-perfect placement.
   margin: 0.15
+
+resourcepack:
+  # Custom hull models need the MoreShips resource pack on clients. The plugin
+  # pushes this URL to every player on join. Empty = no pack pushed.
+  url: "http://192.168.1.12:8765/MoreShips-pack.zip"

@@ -5,6 +5,7 @@ import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.runtime.HullVisualManager;
+import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.runtime.RuntimeBinding;
@@ -65,6 +66,7 @@ public final class ShipEntityBreakListener implements Listener {
     private final ModuleEntityManager moduleEntities;
     private final ShipHitboxManager hitboxes;
     private final HullVisualManager hullVisuals;
+    private final CustomModelVisualManager modelVisuals;
 
     public ShipEntityBreakListener(
             ShipCoreItem shipCoreItem,
@@ -74,6 +76,7 @@ public final class ShipEntityBreakListener implements Listener {
             ShipEntityResolver resolver,
             ShipHitboxManager hitboxes,
             HullVisualManager hullVisuals,
+            CustomModelVisualManager modelVisuals,
             RuntimeBindingRegistry bindingRegistry,
             ShipRegistry shipRegistry,
             ShipTeardownService teardownService) {
@@ -84,6 +87,7 @@ public final class ShipEntityBreakListener implements Listener {
         this.resolver = resolver;
         this.hitboxes = hitboxes;
         this.hullVisuals = hullVisuals;
+        this.modelVisuals = modelVisuals;
         this.bindingRegistry = bindingRegistry;
         this.shipRegistry = shipRegistry;
         this.teardownService = teardownService;
@@ -143,6 +147,7 @@ public final class ShipEntityBreakListener implements Listener {
         moduleEntities.despawnAll(ship.identity());
         hitboxes.despawn(ship.identity());
         hullVisuals.despawn(ship.identity());
+        modelVisuals.despawn(ship.identity());
 
         teardownService.teardown(ship.identity());
         stand.remove();
@@ -168,6 +173,7 @@ public final class ShipEntityBreakListener implements Listener {
             moduleEntities.despawnAll(ship.identity());
             hitboxes.despawn(ship.identity());
             hullVisuals.despawn(ship.identity());
+            modelVisuals.despawn(ship.identity());
             try {
                 shipRegistry.transition(ship.identity(), LifecyclePhase.DESTROYED);
             } catch (IllegalStateException ignored) {

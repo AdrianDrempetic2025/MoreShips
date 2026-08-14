@@ -27,6 +27,7 @@ import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.runtime.HullVisualManager;
 import com.glooshy.ships.runtime.ShipHitboxManager;
+import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ShipEntitySpawner;
 import com.glooshy.ships.ship.Ship;
@@ -54,6 +55,7 @@ public final class MoreShips extends JavaPlugin {
     private ModuleEntityManager moduleEntities;
     private ShipHitboxManager hitboxes;
     private HullVisualManager hullVisuals;
+    private CustomModelVisualManager modelVisuals;
     private YamlShipHitboxStore hitboxStore;
     private ShipMovementService movementService;
 
@@ -92,7 +94,8 @@ public final class MoreShips extends JavaPlugin {
         hitboxes = new ShipHitboxManager(
                 shipIdKey, bindingRegistry, shipRegistry,
                 config.shipHitboxWidth(), config.shipHitboxHeight());
-        hullVisuals = new HullVisualManager(bindingRegistry, shipRegistry);
+        modelVisuals = new CustomModelVisualManager(bindingRegistry, shipRegistry, getLogger());
+        hullVisuals = new HullVisualManager(bindingRegistry, shipRegistry, modelVisuals::hasModel);
         ShipEntityResolver resolver = new ShipEntityResolver(bindingRegistry, hitboxes);
 
         // Load persisted state before listeners attach
@@ -113,7 +116,7 @@ public final class MoreShips extends JavaPlugin {
 
         ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
                 shipCoreItem, moduleItem, cargoService, moduleEntities,
-                resolver, hitboxes, hullVisuals, bindingRegistry, shipRegistry, teardownService);
+                resolver, hitboxes, hullVisuals, modelVisuals, bindingRegistry, shipRegistry, teardownService);
         getServer().getPluginManager().registerEvents(breakListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
@@ -130,6 +133,17 @@ public final class MoreShips extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new CargoInventoryListener(cargoService), this);
 
+        String packUrl = config.resourcePackUrl();
+        if (!packUrl.isBlank()) {
+            getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+                @org.bukkit.event.EventHandler
+                public void onJoin(org.bukkit.event.player.PlayerJoinEvent event) {
+                    event.getPlayer().setResourcePack(packUrl);
+                }
+            }, this);
+            getLogger().info("Resource pack push enabled: " + packUrl);
+        }
+
         if (config.movementEnabled()) {
             getServer().getPluginManager().registerEvents(
                     new ShipPilotListener(shipRegistry, resolver), this);
@@ -140,6 +154,7 @@ public final class MoreShips extends JavaPlugin {
                     moduleEntities,
                     hitboxes,
                     hullVisuals,
+                    modelVisuals,
                     shipIdKey,
                     config.movementMaxSpeed(),
                     config.collisionEnabled(),
@@ -168,7 +183,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-18). Hull visuals (block deck) loaded.");
+        getLogger().info("MoreShips enabled (BUILD-19). Custom Blockbench models (small) loaded.");
     }
 
     @Override

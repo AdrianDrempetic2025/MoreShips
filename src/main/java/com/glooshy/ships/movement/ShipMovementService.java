@@ -5,6 +5,7 @@ import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.HullVisualManager;
+import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.ship.LifecyclePhase;
 import com.glooshy.ships.ship.Ship;
@@ -63,6 +64,7 @@ public final class ShipMovementService implements Runnable {
     private final ModuleEntityManager moduleEntities;
     private final ShipHitboxManager hitboxes;
     private final HullVisualManager hullVisuals;
+    private final CustomModelVisualManager modelVisuals;
     private final org.bukkit.NamespacedKey shipIdKey;
     private final WaterPhysics waterPhysics;
     private final boolean collisionEnabled;
@@ -83,6 +85,7 @@ public final class ShipMovementService implements Runnable {
             @NotNull ModuleEntityManager moduleEntities,
             @NotNull ShipHitboxManager hitboxes,
             @NotNull HullVisualManager hullVisuals,
+            @NotNull CustomModelVisualManager modelVisuals,
             @NotNull org.bukkit.NamespacedKey shipIdKey,
             double maxSpeed,
             boolean collisionEnabled,
@@ -98,6 +101,7 @@ public final class ShipMovementService implements Runnable {
         this.moduleEntities = moduleEntities;
         this.hitboxes = hitboxes;
         this.hullVisuals = hullVisuals;
+        this.modelVisuals = modelVisuals;
         this.shipIdKey = shipIdKey;
         this.maxSpeed = maxSpeed;
         this.acceleration = acceleration;
@@ -181,6 +185,7 @@ public final class ShipMovementService implements Runnable {
             moduleEntities.follow(shipId);
             hitboxes.follow(shipId);
             hullVisuals.follow(shipId);
+            modelVisuals.follow(shipId);
         }
     }
 

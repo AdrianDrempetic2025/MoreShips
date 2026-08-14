@@ -135,6 +135,10 @@ public final class MoreShipsConfig {
         return -Math.abs(config.getDouble("physics.sinkVelocity", 0.30));
     }
 
+    public String resourcePackUrl() {
+        return config.getString("resourcepack.url", "");
+    }
+
     public boolean collisionEnabled() {
         return config.getBoolean("collision.enabled", true);
     }

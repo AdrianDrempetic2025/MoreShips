@@ -34,13 +34,21 @@ public final class HullVisualManager {
 
     private final RuntimeBindingRegistry bindingRegistry;
     private final ShipRegistry shipRegistry;
+    private final java.util.function.Predicate<ShipSize> customModel;
 
     private final Map<ShipIdentity, List<UUID>> byShip = new ConcurrentHashMap<>();
 
     public HullVisualManager(RuntimeBindingRegistry bindingRegistry,
                              ShipRegistry shipRegistry) {
+        this(bindingRegistry, shipRegistry, size -> false);
+    }
+
+    public HullVisualManager(RuntimeBindingRegistry bindingRegistry,
+                             ShipRegistry shipRegistry,
+                             java.util.function.Predicate<ShipSize> customModel) {
         this.bindingRegistry = bindingRegistry;
         this.shipRegistry = shipRegistry;
+        this.customModel = customModel;
     }
 
     /** Bring the hull visuals to the ship; rebuild if missing or wrong block. */
@@ -48,6 +56,10 @@ public final class HullVisualManager {
         Ship ship = shipRegistry.find(shipId).orElse(null);
         if (ship == null || ship.hullMaterial() == null) {
             despawn(shipId);
+            return;
+        }
+        if (customModel.test(ship.size())) {
+            despawn(shipId); // custom Blockbench model renders this size
             return;
         }
         RuntimeBinding binding = bindingRegistry.findByShip(shipId).orElse(null);
