@@ -4,7 +4,6 @@ import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ModuleEntityManager;
-import com.glooshy.ships.runtime.HullVisualManager;
 import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.ship.LifecyclePhase;
@@ -63,7 +62,6 @@ public final class ShipMovementService implements Runnable {
     private final RuntimeBindingRegistry bindingRegistry;
     private final ModuleEntityManager moduleEntities;
     private final ShipHitboxManager hitboxes;
-    private final HullVisualManager hullVisuals;
     private final CustomModelVisualManager modelVisuals;
     private final org.bukkit.NamespacedKey shipIdKey;
     private final WaterPhysics waterPhysics;
@@ -84,7 +82,6 @@ public final class ShipMovementService implements Runnable {
             @NotNull RuntimeBindingRegistry bindingRegistry,
             @NotNull ModuleEntityManager moduleEntities,
             @NotNull ShipHitboxManager hitboxes,
-            @NotNull HullVisualManager hullVisuals,
             @NotNull CustomModelVisualManager modelVisuals,
             @NotNull org.bukkit.NamespacedKey shipIdKey,
             double maxSpeed,
@@ -100,7 +97,6 @@ public final class ShipMovementService implements Runnable {
         this.bindingRegistry = bindingRegistry;
         this.moduleEntities = moduleEntities;
         this.hitboxes = hitboxes;
-        this.hullVisuals = hullVisuals;
         this.modelVisuals = modelVisuals;
         this.shipIdKey = shipIdKey;
         this.maxSpeed = maxSpeed;
@@ -160,6 +156,19 @@ public final class ShipMovementService implements Runnable {
             if (entity instanceof org.bukkit.entity.LivingEntity living && living.isCollidable()) {
                 living.setCollidable(false); // the solid deck must not push the controller
             }
+            if (entity instanceof org.bukkit.entity.ArmorStand stand) {
+                if (stand.isGlowing()) {
+                    stand.setGlowing(false); // heal pre-0.14 stands
+                }
+                if (stand.isVisible()) {
+                    stand.setVisible(false);
+                }
+                if (stand.getEquipment().getHelmet() == null
+                        || stand.getEquipment().getHelmet().getType() != org.bukkit.Material.LEATHER_HELMET) {
+                    stand.getEquipment().setHelmet(
+                            new org.bukkit.inventory.ItemStack(org.bukkit.Material.LEATHER_HELMET));
+                }
+            }
 
             if (ship.phase() == LifecyclePhase.FINALIZED) {
                 ShipMovement movement = movements.computeIfAbsent(
@@ -184,7 +193,6 @@ public final class ShipMovementService implements Runnable {
             // Module entities hold their slot positions; hitbox + hull visuals ride along.
             moduleEntities.follow(shipId);
             hitboxes.follow(shipId);
-            hullVisuals.follow(shipId);
             modelVisuals.follow(shipId);
         }
     }
@@ -250,10 +258,11 @@ public final class ShipMovementService implements Runnable {
                 ? "Ship " + shortId + " [" + ship.currentHp() + "/" + ship.maxHp() + " HP]"
                 : "Unfinished Ship " + shortId;
         org.bukkit.entity.ArmorStand stand = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, as -> {
-            as.setVisible(true);
+            as.setVisible(false);
             as.setGravity(true);
             as.setCollidable(false);
-            as.setGlowing(true);
+            as.setGlowing(false);
+            as.getEquipment().setHelmet(new org.bukkit.inventory.ItemStack(org.bukkit.Material.LEATHER_HELMET));
             as.setCustomNameVisible(true);
             as.customName(net.kyori.adventure.text.Component.text(
                     label, net.kyori.adventure.text.format.NamedTextColor.AQUA));

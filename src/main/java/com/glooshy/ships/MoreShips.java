@@ -25,7 +25,6 @@ import com.glooshy.ships.persistence.YamlShipHitboxStore;
 import com.glooshy.ships.persistence.YamlShipStore;
 import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.ShipEntityResolver;
-import com.glooshy.ships.runtime.HullVisualManager;
 import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
@@ -54,7 +53,6 @@ public final class MoreShips extends JavaPlugin {
     private ModuleEntityStore moduleEntityStore;
     private ModuleEntityManager moduleEntities;
     private ShipHitboxManager hitboxes;
-    private HullVisualManager hullVisuals;
     private CustomModelVisualManager modelVisuals;
     private YamlShipHitboxStore hitboxStore;
     private ShipMovementService movementService;
@@ -95,7 +93,6 @@ public final class MoreShips extends JavaPlugin {
                 shipIdKey, bindingRegistry, shipRegistry,
                 config.shipHitboxWidth(), config.shipHitboxHeight());
         modelVisuals = new CustomModelVisualManager(bindingRegistry, shipRegistry, getLogger());
-        hullVisuals = new HullVisualManager(bindingRegistry, shipRegistry, modelVisuals::hasModel);
         ShipEntityResolver resolver = new ShipEntityResolver(bindingRegistry, hitboxes);
 
         // Load persisted state before listeners attach
@@ -116,7 +113,7 @@ public final class MoreShips extends JavaPlugin {
 
         ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
                 shipCoreItem, moduleItem, cargoService, moduleEntities,
-                resolver, hitboxes, hullVisuals, modelVisuals, bindingRegistry, shipRegistry, teardownService);
+                resolver, hitboxes, modelVisuals, bindingRegistry, shipRegistry, teardownService);
         getServer().getPluginManager().registerEvents(breakListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
@@ -153,7 +150,6 @@ public final class MoreShips extends JavaPlugin {
                     bindingRegistry,
                     moduleEntities,
                     hitboxes,
-                    hullVisuals,
                     modelVisuals,
                     shipIdKey,
                     config.movementMaxSpeed(),

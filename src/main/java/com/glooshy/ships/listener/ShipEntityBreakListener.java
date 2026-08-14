@@ -4,7 +4,6 @@ import com.glooshy.ships.cargo.CargoService;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.ShipEntityResolver;
-import com.glooshy.ships.runtime.HullVisualManager;
 import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.item.ShipCoreItem;
@@ -65,7 +64,6 @@ public final class ShipEntityBreakListener implements Listener {
     private final CargoService cargoService;
     private final ModuleEntityManager moduleEntities;
     private final ShipHitboxManager hitboxes;
-    private final HullVisualManager hullVisuals;
     private final CustomModelVisualManager modelVisuals;
 
     public ShipEntityBreakListener(
@@ -75,7 +73,6 @@ public final class ShipEntityBreakListener implements Listener {
             ModuleEntityManager moduleEntities,
             ShipEntityResolver resolver,
             ShipHitboxManager hitboxes,
-            HullVisualManager hullVisuals,
             CustomModelVisualManager modelVisuals,
             RuntimeBindingRegistry bindingRegistry,
             ShipRegistry shipRegistry,
@@ -86,7 +83,6 @@ public final class ShipEntityBreakListener implements Listener {
         this.moduleEntities = moduleEntities;
         this.resolver = resolver;
         this.hitboxes = hitboxes;
-        this.hullVisuals = hullVisuals;
         this.modelVisuals = modelVisuals;
         this.bindingRegistry = bindingRegistry;
         this.shipRegistry = shipRegistry;
@@ -146,7 +142,6 @@ public final class ShipEntityBreakListener implements Listener {
         dropCargo(stand, ship);
         moduleEntities.despawnAll(ship.identity());
         hitboxes.despawn(ship.identity());
-        hullVisuals.despawn(ship.identity());
         modelVisuals.despawn(ship.identity());
 
         teardownService.teardown(ship.identity());
@@ -172,7 +167,6 @@ public final class ShipEntityBreakListener implements Listener {
             dropCargo(stand, after);
             moduleEntities.despawnAll(ship.identity());
             hitboxes.despawn(ship.identity());
-            hullVisuals.despawn(ship.identity());
             modelVisuals.despawn(ship.identity());
             try {
                 shipRegistry.transition(ship.identity(), LifecyclePhase.DESTROYED);

@@ -5,7 +5,9 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Material;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import java.util.UUID;
 
@@ -35,10 +37,11 @@ public final class ShipEntitySpawner {
 
     public UUID spawnUnfinishedShip(Location location, ShipIdentity shipId) {
         ArmorStand stand = location.getWorld().spawn(location, ArmorStand.class, as -> {
-            as.setVisible(true);
+            as.setVisible(false); // the custom model is the visual; helm = leather hat
             as.setGravity(true);
             as.setCollidable(false); // the solid deck must not push the controller
-            as.setGlowing(true);
+            as.setGlowing(false);
+            as.getEquipment().setHelmet(new ItemStack(Material.LEATHER_HELMET));
             as.customName(Component.text(
                     ENTITY_LABEL + " " + shortId(shipId), NamedTextColor.AQUA));
             as.setCustomNameVisible(true);
