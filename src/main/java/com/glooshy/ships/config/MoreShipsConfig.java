@@ -147,6 +147,18 @@ public final class MoreShipsConfig {
         return config.getString("resourcepack.url", DEFAULT_PACK_URL);
     }
 
+    public double cannonDamage() {
+        return config.getDouble("cannons.damage", 6.0);
+    }
+
+    public long cannonCooldownMillis() {
+        return (long) (config.getDouble("cannons.cooldownSeconds", 3.0) * 1000.0);
+    }
+
+    public double cannonSpeed() {
+        return config.getDouble("cannons.speed", 1.5);
+    }
+
     public boolean collisionEnabled() {
         return config.getBoolean("collision.enabled", true);
     }

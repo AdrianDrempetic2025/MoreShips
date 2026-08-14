@@ -42,15 +42,31 @@ public final class ModuleEntityListener implements Listener {
     private final ShipRegistry shipRegistry;
     private final CargoService cargoService;
     private final ModuleItem moduleItem;
+    private final com.glooshy.ships.combat.CannonService cannons;
 
     public ModuleEntityListener(ModuleEntityManager moduleEntities,
                                 ShipRegistry shipRegistry,
                                 CargoService cargoService,
-                                ModuleItem moduleItem) {
+                                ModuleItem moduleItem,
+                                com.glooshy.ships.combat.CannonService cannons) {
         this.moduleEntities = moduleEntities;
         this.shipRegistry = shipRegistry;
         this.cargoService = cargoService;
         this.moduleItem = moduleItem;
+        this.cannons = cannons;
+    }
+
+    /** RQCA-18: right-click a fitted cannon to fire it (FINALIZED ships only). */
+    private void fireCannon(Player player, Ship ship, ModulePos pos, ArmorStand stand) {
+        if (ship.phase() != LifecyclePhase.FINALIZED) {
+            player.sendMessage(Component.text(
+                    "Cannons only fire on finalized ships.", NamedTextColor.RED));
+            return;
+        }
+        // The cannon's facing: outward from the ship center through this
+        // module's hull grid position, expressed in ship-local coords
+        cannons.fire(player, ship, stand.getLocation(),
+                pos.localX(ship.size()), pos.localZ(ship.size()));
     }
 
     @EventHandler
@@ -86,9 +102,7 @@ public final class ModuleEntityListener implements Listener {
                 }
                 stand.addPassenger(player);
             }
-            case CANNON -> player.sendMessage(Component.text(
-                    "Cannons fire in the next slice — this cannon is decorative for now.",
-                    NamedTextColor.GRAY));
+            case CANNON -> fireCannon(player, ship, pos, stand);
         }
     }
 

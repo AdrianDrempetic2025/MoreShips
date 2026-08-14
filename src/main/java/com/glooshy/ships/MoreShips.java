@@ -125,8 +125,15 @@ public final class MoreShips extends JavaPlugin {
                 new ShipConfigUiListener(shipRegistry, resolver, moduleItem, moduleEntities,
                         cargoService), this);
 
+        org.bukkit.NamespacedKey cannonMarker = new org.bukkit.NamespacedKey(this, "cannon_shot");
+        com.glooshy.ships.combat.CannonService cannonService = new com.glooshy.ships.combat.CannonService(
+                shipRegistry, cannonMarker,
+                config.cannonDamage(), config.cannonCooldownMillis(), config.cannonSpeed());
         getServer().getPluginManager().registerEvents(
-                new ModuleEntityListener(moduleEntities, shipRegistry, cargoService, moduleItem), this);
+                new ModuleEntityListener(moduleEntities, shipRegistry, cargoService, moduleItem,
+                        cannonService), this);
+        getServer().getPluginManager().registerEvents(
+                new com.glooshy.ships.listener.CannonHitListener(cannonService, resolver), this);
 
         getServer().getPluginManager().registerEvents(
                 new CargoInventoryListener(cargoService), this);
@@ -181,7 +188,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-28). Ship model worn as helmet - native follow.");
+        getLogger().info("MoreShips enabled (BUILD-29). Cannons online.");
     }
 
     @Override

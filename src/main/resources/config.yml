@@ -97,3 +97,11 @@ resourcepack:
   # Custom hull models need the MoreShips resource pack on clients. The plugin
   # pushes this URL to every player on join. Empty = no pack pushed.
   url: "http://192.168.1.12:8765/MoreShips-pack.zip"
+
+cannons:
+  # Damage one cannon shot deals to another ship's HP.
+  damage: 6.0
+  # Per-cannon reload time in seconds.
+  cooldownSeconds: 3.0
+  # Shot speed in blocks per tick.
+  speed: 1.5
