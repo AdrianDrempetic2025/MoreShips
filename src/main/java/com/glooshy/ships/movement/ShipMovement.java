@@ -17,7 +17,7 @@ package com.glooshy.ships.movement;
  */
 public final class ShipMovement {
 
-    private final double maxSpeed;
+    private double maxSpeed;
     private final double acceleration;
     private final double friction;
 
@@ -58,6 +58,21 @@ public final class ShipMovement {
     public void brake() {
         currentSpeed = Math.max(0.0, currentSpeed - friction * 4.0);
         engaged = false;
+    }
+
+    /** S key from standstill: slow reverse. */
+    public void reverse() {
+        currentSpeed = -Math.max(maxSpeed / 3.0, 0.05);
+        engaged = false;
+    }
+
+    public boolean isReversing() {
+        return currentSpeed < 0;
+    }
+
+    /** Sprint boost retunes the ceiling on the fly. */
+    public void setMaxSpeed(double newMax) {
+        maxSpeed = newMax;
     }
 
     public void disengage() {

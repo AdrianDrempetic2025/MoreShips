@@ -41,7 +41,7 @@ import org.jetbrains.annotations.Nullable;
 public final class ShipsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("give", "info", "finalize", "module", "cargo", "debug", "help");
+            List.of("give", "info", "finalize", "module", "cargo", "debug", "reload", "help");
 
     private static final List<String> MODULE_SUBCOMMANDS = List.of("list", "remove", "move");
 
@@ -56,6 +56,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
     private final ModuleEntityManager moduleEntities;
     private final ShipEntityResolver resolver;
     private final CustomModelVisualManager modelVisuals;
+    private final org.bukkit.plugin.java.JavaPlugin plugin;
 
     public ShipsCommand(ShipCoreItem shipCoreItem,
                         ModuleItem moduleItem,
@@ -65,7 +66,8 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                         CargoService cargoService,
                         ModuleEntityManager moduleEntities,
                         ShipEntityResolver resolver,
-                        CustomModelVisualManager modelVisuals) {
+                        CustomModelVisualManager modelVisuals,
+                        org.bukkit.plugin.java.JavaPlugin plugin) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.shipRegistry = shipRegistry;
@@ -75,6 +77,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         this.moduleEntities = moduleEntities;
         this.resolver = resolver;
         this.modelVisuals = modelVisuals;
+        this.plugin = plugin;
     }
 
     @Override
@@ -91,6 +94,12 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             case "module" -> handleModule(sender, args);
             case "cargo" -> handleCargo(sender);
             case "debug" -> handleDebug(sender);
+            case "reload" -> {
+                plugin.reloadConfig();
+                sender.sendMessage(Component.text(
+                        "MoreShips config reloaded. Some values (recipes, item "
+                                + "materials) need a full restart.", NamedTextColor.GREEN));
+            }
             case "help" -> sendHelp(sender);
             default -> sender.sendMessage(Component.text(
                     "Unknown subcommand: " + args[0], NamedTextColor.RED));

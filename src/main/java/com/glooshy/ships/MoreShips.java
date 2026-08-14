@@ -186,7 +186,7 @@ public final class MoreShips extends JavaPlugin {
 
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener,
-                cargoService, moduleEntities, resolver, modelVisuals);
+                cargoService, moduleEntities, resolver, modelVisuals, this);
         PluginCommand command = getCommand("moreships");
         if (command != null) {
             command.setExecutor(shipsCommand);
@@ -195,7 +195,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-30). Cannons + crafting recipes.");
+        getLogger().info("MoreShips enabled (BUILD-31). Reverse + sprint boost + reload.");
     }
 
     @Override

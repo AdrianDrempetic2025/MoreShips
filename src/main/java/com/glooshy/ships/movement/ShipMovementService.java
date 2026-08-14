@@ -220,10 +220,17 @@ public final class ShipMovementService implements Runnable {
     private void steerByInput(@NotNull Entity shipEntity, @NotNull Player pilot,
                               @NotNull ShipMovement movement) {
         org.bukkit.Input input = pilot.getCurrentInput();
+        boolean sprint = input.isSprint();
+        double maxSpeed = sprint ? this.maxSpeed * 1.5 : this.maxSpeed;
+        movement.setMaxSpeed(maxSpeed);
         if (input.isForward()) {
             movement.engage();
         } else if (input.isBackward()) {
-            movement.brake();
+            if (movement.currentSpeed() <= 0.0 && !movement.isMoving()) {
+                movement.reverse(); // S from standstill backs up slowly
+            } else {
+                movement.brake();
+            }
         } else {
             movement.disengage();
         }
