@@ -36,6 +36,11 @@ public final class HullValidator {
     }
 
     public @NotNull HullValidationResult validate(@NotNull Material material) {
+        // getHardness() THROWS for non-block materials (items, tools) — the
+        // player can right-click an unfinished ship holding anything
+        if (!material.isBlock()) {
+            return HullValidationResult.invalid("Hull material must be a placeable block.");
+        }
         return validateRules(
                 material.isAir(),
                 material.isBlock(),
