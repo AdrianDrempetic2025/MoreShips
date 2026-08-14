@@ -52,6 +52,11 @@ public final class ShipHitboxManager {
         return Optional.ofNullable(byEntity.get(entityUuid));
     }
 
+    /** The hitbox entity UUID of a ship, if one is tracked. */
+    public Optional<UUID> entityUuidOf(ShipIdentity shipId) {
+        return Optional.ofNullable(byShip.get(shipId));
+    }
+
     /** Bring the hitbox to the ship's position; (re)spawn if missing. */
     public void follow(ShipIdentity shipId) {
         RuntimeBinding binding = bindingRegistry.findByShip(shipId).orElse(null);

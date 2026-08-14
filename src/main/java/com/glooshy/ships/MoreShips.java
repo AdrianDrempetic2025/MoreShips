@@ -135,6 +135,7 @@ public final class MoreShips extends JavaPlugin {
                     bindingRegistry,
                     moduleEntities,
                     hitboxes,
+                    shipIdKey,
                     config.movementMaxSpeed(),
                     config.movementAcceleration(),
                     config.movementFriction(),

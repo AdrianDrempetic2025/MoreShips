@@ -100,7 +100,7 @@ public final class MoreShipsConfig {
     }
 
     public double physicsSinkVelocity() {
-        return config.getDouble("physics.sinkVelocity", 0.30);
+        return -Math.abs(config.getDouble("physics.sinkVelocity", 0.30));
     }
 
     private static final Map<ModuleType, Material> DEFAULT_MODULE_MATERIALS = Map.of(

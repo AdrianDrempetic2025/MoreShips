@@ -23,7 +23,9 @@ public final class WaterPhysics {
 
     public WaterPhysics(double riseVelocity, double sinkVelocity) {
         this.riseVelocity = riseVelocity;
-        this.sinkVelocity = sinkVelocity;
+        // Config exposes the sink speed as a positive magnitude; normalize so a
+        // positive input can never become an upward "sink" (bug: ships flying)
+        this.sinkVelocity = -Math.abs(sinkVelocity);
     }
 
     public static WaterPhysics defaults() {

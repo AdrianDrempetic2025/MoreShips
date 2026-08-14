@@ -61,6 +61,7 @@ public final class ShipMovementService implements Runnable {
     private final RuntimeBindingRegistry bindingRegistry;
     private final ModuleEntityManager moduleEntities;
     private final ShipHitboxManager hitboxes;
+    private final org.bukkit.NamespacedKey shipIdKey;
     private final WaterPhysics waterPhysics;
     private final double maxSpeed;
     private final double acceleration;
@@ -75,6 +76,7 @@ public final class ShipMovementService implements Runnable {
             @NotNull RuntimeBindingRegistry bindingRegistry,
             @NotNull ModuleEntityManager moduleEntities,
             @NotNull ShipHitboxManager hitboxes,
+            @NotNull org.bukkit.NamespacedKey shipIdKey,
             double maxSpeed,
             double acceleration,
             double friction,
@@ -85,6 +87,7 @@ public final class ShipMovementService implements Runnable {
         this.bindingRegistry = bindingRegistry;
         this.moduleEntities = moduleEntities;
         this.hitboxes = hitboxes;
+        this.shipIdKey = shipIdKey;
         this.maxSpeed = maxSpeed;
         this.acceleration = acceleration;
         this.friction = friction;
@@ -129,6 +132,7 @@ public final class ShipMovementService implements Runnable {
             Entity entity = Bukkit.getEntity(entityUuid);
             if (entity == null || entity.isDead()) {
                 movements.remove(shipId);
+                respawnControllerAtHitbox(ship, shipId);
                 continue;
             }
 
@@ -179,6 +183,49 @@ public final class ShipMovementService implements Runnable {
     private static void steerTowardPilot(@NotNull Entity shipEntity, @NotNull Player pilot) {
         Location pilotLoc = pilot.getLocation();
         shipEntity.setRotation(pilotLoc.getYaw(), pilotLoc.getPitch());
+    }
+
+    /**
+     * Self-heal: if the controller ArmorStand died (killed, void, world edit)
+     * but the ship still exists in the registry, respawn the controller at the
+     * last known position — the surviving hitbox entity — and rebind. Without
+     * this, a killed stand left an orphaned hitbox and a ghost ship (bug:
+     * "on armor stand death, the ship hitbox remains").
+     */
+    private void respawnControllerAtHitbox(Ship ship, ShipIdentity shipId) {
+        org.bukkit.entity.Interaction anchor = hitboxes.entityUuidOf(shipId)
+                .map(Bukkit::getEntity)
+                .filter(e -> e != null && !e.isDead())
+                .filter(org.bukkit.entity.Interaction.class::isInstance)
+                .map(org.bukkit.entity.Interaction.class::cast)
+                .orElse(null);
+        if (anchor == null) {
+            return; // no position anchor — nothing we can heal from
+        }
+        org.bukkit.Location loc = anchor.getLocation();
+        String shortId = shipId.encoded();
+        int dash = shortId.indexOf('-');
+        if (dash > 0) {
+            shortId = shortId.substring(0, dash);
+        }
+        final String label = ship.phase() == LifecyclePhase.FINALIZED
+                ? "Ship " + shortId + " [" + ship.currentHp() + "/" + ship.maxHp() + " HP]"
+                : "Unfinished Ship " + shortId;
+        org.bukkit.entity.ArmorStand stand = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, as -> {
+            as.setVisible(true);
+            as.setGravity(true);
+            as.setGlowing(true);
+            as.setCustomNameVisible(true);
+            as.customName(net.kyori.adventure.text.Component.text(
+                    label, net.kyori.adventure.text.format.NamedTextColor.AQUA));
+            as.getPersistentDataContainer().set(
+                    shipIdKey, org.bukkit.persistence.PersistentDataType.STRING, shipId.encoded());
+            if (ship.hullMaterial() != null) {
+                as.getEquipment().setHelmet(new org.bukkit.inventory.ItemStack(ship.hullMaterial()));
+            }
+        });
+        bindingRegistry.release(shipId);
+        bindingRegistry.bind(RuntimeBinding.active(shipId, stand.getUniqueId()));
     }
 
     /**

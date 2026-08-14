@@ -40,4 +40,13 @@ class WaterPhysicsTest {
         assertEquals(0.35, defaults.riseVelocity(), 1e-9);
         assertEquals(-0.30, defaults.sinkVelocity(), 1e-9);
     }
+
+    /** Regression: a positive sink input (config magnitude) must sink, not fly. */
+    @Test
+    void positive_sink_input_is_normalized_downward() {
+        WaterPhysics badSign = new WaterPhysics(0.35, 0.30);
+        assertTrue(badSign.verticalVelocity(false, false) < 0.0,
+                "positive sinkVelocity input must never push the ship upward");
+        assertTrue(badSign.verticalVelocity(false, true) < 0.0);
+    }
 }
