@@ -79,6 +79,11 @@ public final class CustomModelVisualManager {
         }
     }
 
+    /** Vertical lift of the whole model relative to the controller (blocks).
+     *  The model's mass sits below its [8,8,8] origin, so without this the
+     *  hull rides half a block underwater. */
+    private static final float MODEL_Y_OFFSET = 0.5f;
+
     private final RuntimeBindingRegistry bindingRegistry;
     private final ShipRegistry shipRegistry;
     private final Logger logger;
@@ -240,15 +245,24 @@ public final class CustomModelVisualManager {
                     (float) (cube.rotOrigin()[2] - 8.0));
 
             Vector3f world = new Vector3f(offset).rotate(shipRot).div(16.0f);
+            world.y += MODEL_Y_OFFSET;
             Location target = base.clone().add(world.x, world.y, world.z);
             if (display.getLocation().distanceSquared(target) > 0.01) {
                 display.teleport(target);
             }
 
             Quaternionf fullRot = new Quaternionf(shipRot).mul(cubeRot);
+            // THE rigid-body fix: the centering translation must be rotated by
+            // the SAME rotation (T = R * (-size/2)), otherwise each cube's
+            // center orbits its entity as the ship turns — the "independent
+            // rotation" bug. This mirrors how the JSON model compositor places
+            // elements: vertex -> element rotation about element origin ->
+            // model space -> entity rotation.
+            Vector3f centering = new Vector3f(
+                    (float) (-size[0] / 2.0), (float) (-size[1] / 2.0),
+                    (float) (-size[2] / 2.0)).rotate(fullRot);
             Transformation t = new Transformation(
-                    new Vector3f((float) (-size[0] / 2.0), (float) (-size[1] / 2.0),
-                            (float) (-size[2] / 2.0)),
+                    centering,
                     fullRot,
                     new Vector3f((float) size[0], (float) size[1], (float) size[2]),
                     new Quaternionf());
@@ -266,6 +280,7 @@ public final class CustomModelVisualManager {
                     display.teleport(base);
                 }
                 Vector3f transl = new Vector3f(-0.5f, -0.5f, -0.5f).rotate(shipRot);
+                transl.y += MODEL_Y_OFFSET;
                 Transformation t = new Transformation(
                         transl, new Quaternionf(shipRot),
                         new Vector3f(1.0f, 1.0f, 1.0f), new Quaternionf());

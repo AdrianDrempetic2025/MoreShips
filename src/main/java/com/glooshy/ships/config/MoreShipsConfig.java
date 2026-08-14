@@ -124,7 +124,7 @@ public final class MoreShipsConfig {
     }
 
     public double shipHitboxHeight() {
-        return config.getDouble("ship.hitboxHeight", 1.8);
+        return config.getDouble("ship.hitboxHeight", 0.5);
     }
 
     public double physicsRiseVelocity() {
