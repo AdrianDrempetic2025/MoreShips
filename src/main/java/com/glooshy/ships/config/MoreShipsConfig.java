@@ -115,6 +115,10 @@ public final class MoreShipsConfig {
         return config.getDouble("movement.friction", 0.05);
     }
 
+    public double movementTurnRate() {
+        return config.getDouble("movement.turnRate", 4.0);
+    }
+
     public double shipHitboxWidth() {
         return config.getDouble("ship.hitboxWidth", 3.0);
     }

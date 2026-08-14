@@ -54,6 +54,12 @@ public final class ShipMovement {
      * Mark this ship as un-piloted. Subsequent {@link #tick()} calls decelerate
      * toward 0 using friction.
      */
+    /** Hard brake: S key — shed speed much faster than water friction alone. */
+    public void brake() {
+        currentSpeed = Math.max(0.0, currentSpeed - friction * 4.0);
+        engaged = false;
+    }
+
     public void disengage() {
         engaged = false;
     }

@@ -143,7 +143,8 @@ public final class MoreShips extends JavaPlugin {
                     config.movementAcceleration(),
                     config.movementFriction(),
                     config.physicsRiseVelocity(),
-                    config.physicsSinkVelocity());
+                    config.physicsSinkVelocity(),
+                    config.movementTurnRate());
             movementService.start();
             getLogger().info("Movement service started: maxSpeed=" + config.movementMaxSpeed()
                     + " accel=" + config.movementAcceleration()
@@ -163,7 +164,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-15). Ship sizes: Small/Medium/Large.");
+        getLogger().info("MoreShips enabled (BUILD-16). WASD control + rectangular solid hull.");
     }
 
     @Override

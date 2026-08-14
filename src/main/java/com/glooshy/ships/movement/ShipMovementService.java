@@ -65,6 +65,8 @@ public final class ShipMovementService implements Runnable {
     private final WaterPhysics waterPhysics;
     private final boolean collisionEnabled;
     private final double collisionMargin;
+    /** Degrees per tick the ship turns while the pilot steers left/right. */
+    private final double turnRateDeg;
     private final double maxSpeed;
     private final double acceleration;
     private final double friction;
@@ -85,7 +87,8 @@ public final class ShipMovementService implements Runnable {
             double acceleration,
             double friction,
             double riseVelocity,
-            double sinkVelocity) {
+            double sinkVelocity,
+            double turnRateDeg) {
         this.plugin = plugin;
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
@@ -98,6 +101,7 @@ public final class ShipMovementService implements Runnable {
         this.waterPhysics = new WaterPhysics(riseVelocity, sinkVelocity);
         this.collisionEnabled = collisionEnabled;
         this.collisionMargin = collisionMargin;
+        this.turnRateDeg = turnRateDeg;
     }
 
     public synchronized void start() {
@@ -152,8 +156,7 @@ public final class ShipMovementService implements Runnable {
 
                 Player pilot = findPilot(entity);
                 if (pilot != null) {
-                    movement.engage();
-                    steerTowardPilot(entity, pilot);
+                    steerByInput(entity, pilot, movement);
                 } else {
                     movement.disengage();
                 }
@@ -183,12 +186,28 @@ public final class ShipMovementService implements Runnable {
     }
 
     /**
-     * Center-turn (RQCA-15): the ship's yaw follows the pilot's yaw. We set
-     * the ship's rotation directly. Passengers ride along automatically.
+     * Vanilla-boat-style control (RQCA-14/15): W accelerates, S brakes,
+     * A/D turn the hull. The client reports the pilot's key presses every
+     * tick via the Paper Input API.
      */
-    private static void steerTowardPilot(@NotNull Entity shipEntity, @NotNull Player pilot) {
-        Location pilotLoc = pilot.getLocation();
-        shipEntity.setRotation(pilotLoc.getYaw(), pilotLoc.getPitch());
+    private void steerByInput(@NotNull Entity shipEntity, @NotNull Player pilot,
+                              @NotNull ShipMovement movement) {
+        org.bukkit.Input input = pilot.getCurrentInput();
+        if (input.isForward()) {
+            movement.engage();
+        } else if (input.isBackward()) {
+            movement.brake();
+        } else {
+            movement.disengage();
+        }
+        float yaw = shipEntity.getLocation().getYaw();
+        if (input.isLeft()) {
+            yaw = (float) (yaw - turnRateDeg);
+        }
+        if (input.isRight()) {
+            yaw = (float) (yaw + turnRateDeg);
+        }
+        shipEntity.setRotation(yaw, 0.0f);
     }
 
     /**

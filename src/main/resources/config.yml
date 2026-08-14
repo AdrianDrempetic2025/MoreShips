@@ -55,6 +55,9 @@ movement:
   # water drag). Default 0.05 → ship drifts to a stop in 8 ticks (~0.4s)
   # after the pilot dismounts.
   friction: 0.05
+  # Hull turn rate in degrees per tick while the pilot steers (A/D),
+  # vanilla-boat style. 4.0 = ~72 degrees/second.
+  turnRate: 4.0
 
 modules:
   # Base vanilla material per module type (RQCA-08). The PersistentDataContainer
