@@ -33,17 +33,23 @@ def main():
             continue
         m = json.load(open(src, encoding="utf-8"))
         tex_ref = f"moreships:item/{os.path.splitext(texture)[0]}"
-        # NOTE: the artist's Blockbench "display" settings (GUI/hand/head
-        # transforms, often scale 0.1-0.5) must NOT ship — an ItemDisplay would
-        # render the model at that tiny scale. Display entities render raw.
-        trim = {
+        # Bake the WHOLE model (all cubes). Faces the artist left untextured
+        # (#missing) get the artist's texture too — one rigid client-rendered
+        # model. Hull material is shown in-game by orbiting defense blocks.
+        # The artist's Blockbench "display" settings must NOT ship — display
+        # entities render raw.
+        whole = {
             "credit": m.get("credit", ""),
             "texture_size": [64, 64],
             "textures": {"0": tex_ref, "particle": tex_ref},
-            "elements": [el for el in m["elements"]
-                         if any(f.get("texture") not in (None, "#missing")
-                                for f in el.get("faces", {}).values())],
+            "elements": [],
         }
+        for el in m["elements"]:
+            for face in el.get("faces", {}).values():
+                if face.get("texture") in (None, "#missing"):
+                    face["texture"] = "#0"
+            whole["elements"].append(el)
+        trim = whole
         if not trim["elements"]:
             print(f"skip {size}: no textured cubes")
             continue

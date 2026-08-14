@@ -83,6 +83,12 @@ public final class CustomModelVisualManager {
         }
     }
 
+    /** Small floating hull-material cubes orbiting the ship (defense symbol). */
+    private static final int DEFENSE_BLOCK_COUNT = 3;
+    private static final float DEFENSE_BLOCK_SIZE = 0.3f;
+    private static final double DEFENSE_ORBIT_RADIUS = 1.6;
+    private static final double DEFENSE_BLOCK_HEIGHT = 0.9;
+
     private final RuntimeBindingRegistry bindingRegistry;
     private final ShipRegistry shipRegistry;
     private final Logger logger;
@@ -190,7 +196,7 @@ public final class CustomModelVisualManager {
             return e == null || e.isDead();
         });
 
-        int expected = spec.hullCubes.size() + 1; // + trim ItemDisplay
+        int expected = 1 + DEFENSE_BLOCK_COUNT; // whole-model display + defense blocks
         if (tracked.size() != expected) {
             for (UUID uuid : tracked) {
                 Entity e = Bukkit.getEntity(uuid);
@@ -207,29 +213,37 @@ public final class CustomModelVisualManager {
 
     private List<UUID> spawnVisuals(ShipIdentity shipId, Ship ship, ModelSpec spec, Location base) {
         List<UUID> entities = new ArrayList<>();
-        Material hull = ship.hullMaterial();
 
-        for (HullCube cube : spec.hullCubes) {
-            BlockDisplay display = base.getWorld().spawn(base, BlockDisplay.class, bd -> {
-                bd.setBlock(hull.createBlockData());
-                bd.setPersistent(false);
-                bd.setTeleportDuration(1);
-            });
-            entities.add(display.getUniqueId());
-        }
-
-        ItemDisplay trim = base.getWorld().spawn(base, ItemDisplay.class, id -> {
+        // ONE ItemDisplay renders the whole baked model — the client composes
+        // every cube into a single rigid object. Hull material no longer
+        // retextures the hull; it is shown by the orbiting defense blocks.
+        ItemDisplay model = base.getWorld().spawn(base, ItemDisplay.class, id -> {
+            id.setTeleportDuration(1);
+            id.setInterpolationDuration(1);
+            id.setInterpolationDelay(0);
             ItemStack stack = new ItemStack(Material.PAPER);
             ItemMeta meta = stack.getItemMeta();
             meta.setItemModel(spec.trimItemModel);
             stack.setItemMeta(meta);
             id.setItemStack(stack);
             id.setPersistent(false);
-            id.setTeleportDuration(1);
             id.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
             id.setViewRange(1.0f);
         });
-        entities.add(trim.getUniqueId());
+        entities.add(model.getUniqueId());
+
+        // Defense blocks: small floating cubes of the LIVE hull material,
+        // orbiting the ship — the material the player applied is always visible
+        for (int i = 0; i < DEFENSE_BLOCK_COUNT; i++) {
+            BlockDisplay block = base.getWorld().spawn(base, BlockDisplay.class, bd -> {
+                bd.setBlock(ship.hullMaterial().createBlockData());
+                bd.setPersistent(false);
+                bd.setTeleportDuration(1);
+                bd.setInterpolationDuration(1);
+                bd.setInterpolationDelay(0);
+            });
+            entities.add(block.getUniqueId());
+        }
 
         positionVisuals(ship, spec, base, entities);
         return entities;
@@ -239,67 +253,14 @@ public final class CustomModelVisualManager {
         float yawRad = (float) Math.toRadians(base.getYaw());
         Quaternionf shipRot = new Quaternionf().rotationY(-yawRad);
 
-        for (int i = 0; i < spec.hullCubes.size() && i < tracked.size(); i++) {
-            Entity entity = Bukkit.getEntity(tracked.get(i));
-            if (!(entity instanceof BlockDisplay display) || display.isDead()) {
-                continue;
-            }
-            HullCube cube = spec.hullCubes.get(i);
-            double[] size = cube.size();
-            double[] center = cube.center();
-
-            // Rigid-body placement: the cube's own rotation (any axis) about its
-            // origin, then the ship's yaw — every cube shares the ship frame,
-            // so the assembly moves and turns as ONE object.
-            Quaternionf cubeRot = axisRotation(cube.axis(), cube.angleDeg());
-            Vector3f offset = new Vector3f(
-                    (float) (center[0] - cube.rotOrigin()[0]),
-                    (float) (center[1] - cube.rotOrigin()[1]),
-                    (float) (center[2] - cube.rotOrigin()[2]));
-            offset.rotate(cubeRot);
-            double[] c = spec.center;
-            offset.add((float) (cube.rotOrigin()[0] - c[0]),
-                    (float) (cube.rotOrigin()[1] - c[1]),
-                    (float) (cube.rotOrigin()[2] - c[2]));
-
-            Vector3f world = new Vector3f(offset).rotate(shipRot).div(16.0f);
-            Location target = base.clone().add(world.x, world.y, world.z);
-            if (display.getLocation().distanceSquared(target) > 0.01) {
-                display.teleport(target);
-            }
-
-            Quaternionf fullRot = new Quaternionf(shipRot).mul(cubeRot);
-            // THE rigid-body fix: the centering translation must be rotated by
-            // the SAME rotation (T = R * (-size/2)), otherwise each cube's
-            // center orbits its entity as the ship turns — the "independent
-            // rotation" bug. This mirrors how the JSON model compositor places
-            // elements: vertex -> element rotation about element origin ->
-            // model space -> entity rotation.
-            Vector3f centering = new Vector3f(
-                    (float) (-size[0] / 2.0), (float) (-size[1] / 2.0),
-                    (float) (-size[2] / 2.0)).rotate(fullRot);
-            Transformation t = new Transformation(
-                    centering,
-                    fullRot,
-                    new Vector3f((float) size[0], (float) size[1], (float) size[2]),
-                    new Quaternionf());
-            display.setTransformation(t);
-        }
-
-        // Trim ItemDisplay: teleports WITH the ship (bug: it never moved after
-        // spawn) and rotates with it. Model px [8,8,8] maps to the entity, the
-        // same frame the hull cubes use, so the two layers stay glued.
-        int trimIndex = spec.hullCubes.size();
-        if (trimIndex < tracked.size()) {
-            Entity entity = Bukkit.getEntity(tracked.get(trimIndex));
+        // Whole model: client renders it anchored at [8,8,8]px; shift so the
+        // model's TRUE bbox center sits on the controller, rotate with the ship
+        double[] c = spec.center;
+        if (!tracked.isEmpty()) {
+            Entity entity = Bukkit.getEntity(tracked.get(0));
             if (entity instanceof ItemDisplay display && !display.isDead()) {
                 display.teleport(base);
                 display.setInterpolationDelay(0);
-                // The ItemDisplay natively anchors the model's [8,8,8]px at the
-                // entity; shifting by (8 - C)/16 puts the model's TRUE center
-                // (same C the hull cubes use) on the controller — both layers
-                // now share one frame and stay glued.
-                double[] c = spec.center;
                 Vector3f transl = new Vector3f(
                         (float) ((8.0 - c[0]) / 16.0),
                         (float) ((8.0 - c[1]) / 16.0),
@@ -310,15 +271,41 @@ public final class CustomModelVisualManager {
                 display.setTransformation(t);
             }
         }
+
+        // Defense blocks orbit the ship center, evenly spaced, slow rotation
+        long now = System.currentTimeMillis();
+        double orbitAngle = (now % 6000L) / 6000.0 * 2.0 * Math.PI;
+        for (int i = 0; i < DEFENSE_BLOCK_COUNT && 1 + i < tracked.size(); i++) {
+            Entity entity = Bukkit.getEntity(tracked.get(1 + i));
+            if (!(entity instanceof BlockDisplay display) || display.isDead()) {
+                continue;
+            }
+            display.setInterpolationDelay(0);
+            double angle = orbitAngle + (2.0 * Math.PI * i / DEFENSE_BLOCK_COUNT);
+            double localX = Math.cos(angle) * DEFENSE_ORBIT_RADIUS;
+            double localZ = Math.sin(angle) * DEFENSE_ORBIT_RADIUS;
+            double[] world = worldOffset(base.getYaw(), localX, localZ);
+            Location target = base.clone().add(world[0], DEFENSE_BLOCK_HEIGHT, world[1]);
+            display.teleport(target);
+            Quaternionf spin = new Quaternionf()
+                    .rotationY((float) (-angle - yawRad));
+            Vector3f centering = new Vector3f(
+                    -DEFENSE_BLOCK_SIZE / 2.0f, -DEFENSE_BLOCK_SIZE / 2.0f,
+                    -DEFENSE_BLOCK_SIZE / 2.0f).rotate(spin);
+            display.setTransformation(new Transformation(
+                    centering, spin,
+                    new Vector3f(DEFENSE_BLOCK_SIZE, DEFENSE_BLOCK_SIZE, DEFENSE_BLOCK_SIZE),
+                    new Quaternionf()));
+        }
     }
 
-    private static Quaternionf axisRotation(String axis, double angleDeg) {
-        float rad = (float) -Math.toRadians(angleDeg);
-        return switch (axis == null ? "y" : axis) {
-            case "x" -> new Quaternionf().rotationX(rad);
-            case "z" -> new Quaternionf().rotationZ(rad);
-            default -> new Quaternionf().rotationY(rad);
-        };
+    private static double[] worldOffset(double yawDegrees, double localX, double localZ) {
+        double yawRad = Math.toRadians(yawDegrees);
+        double sin = Math.sin(yawRad);
+        double cos = Math.cos(yawRad);
+        double dx = -cos * localX - sin * localZ;
+        double dz = -sin * localX + cos * localZ;
+        return new double[] {dx, dz};
     }
 
     /** Remove the custom visuals of a ship. */
