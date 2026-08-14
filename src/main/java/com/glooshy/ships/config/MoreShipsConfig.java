@@ -1,5 +1,8 @@
 package com.glooshy.ships.config;
 
+import com.glooshy.ships.ship.ModuleType;
+import java.util.EnumMap;
+import java.util.Map;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -82,5 +85,43 @@ public final class MoreShipsConfig {
 
     public double movementFriction() {
         return config.getDouble("movement.friction", 0.05);
+    }
+
+    private static final Map<ModuleType, Material> DEFAULT_MODULE_MATERIALS = Map.of(
+            ModuleType.HELM, Material.COMPASS,
+            ModuleType.SEAT, Material.OAK_STAIRS,
+            ModuleType.CARGO, Material.CHEST,
+            ModuleType.CANNON, Material.DISPENSER);
+
+    public @NotNull Material moduleMaterial(@NotNull ModuleType type) {
+        String name = config.getString("modules." + type.name().toLowerCase() + ".material");
+        if (name != null) {
+            Material resolved = Material.matchMaterial(name);
+            if (resolved != null) {
+                return resolved;
+            }
+        }
+        return DEFAULT_MODULE_MATERIALS.get(type);
+    }
+
+    public @NotNull Map<ModuleType, Material> moduleMaterials() {
+        Map<ModuleType, Material> materials = new EnumMap<>(ModuleType.class);
+        for (ModuleType type : ModuleType.values()) {
+            materials.put(type, moduleMaterial(type));
+        }
+        return materials;
+    }
+
+    public @NotNull String moduleDisplayName(@NotNull ModuleType type) {
+        return config.getString("modules." + type.name().toLowerCase() + ".displayName",
+                type.name().charAt(0) + type.name().substring(1).toLowerCase() + " Module");
+    }
+
+    public @NotNull Map<ModuleType, String> moduleDisplayNames() {
+        Map<ModuleType, String> names = new EnumMap<>(ModuleType.class);
+        for (ModuleType type : ModuleType.values()) {
+            names.put(type, moduleDisplayName(type));
+        }
+        return names;
     }
 }

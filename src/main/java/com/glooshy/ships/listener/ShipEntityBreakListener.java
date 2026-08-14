@@ -1,5 +1,6 @@
 package com.glooshy.ships.listener;
 
+import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
@@ -53,13 +54,16 @@ public final class ShipEntityBreakListener implements Listener {
     private final RuntimeBindingRegistry bindingRegistry;
     private final ShipRegistry shipRegistry;
     private final ShipTeardownService teardownService;
+    private final ModuleItem moduleItem;
 
     public ShipEntityBreakListener(
             ShipCoreItem shipCoreItem,
+            ModuleItem moduleItem,
             RuntimeBindingRegistry bindingRegistry,
             ShipRegistry shipRegistry,
             ShipTeardownService teardownService) {
         this.shipCoreItem = shipCoreItem;
+        this.moduleItem = moduleItem;
         this.bindingRegistry = bindingRegistry;
         this.shipRegistry = shipRegistry;
         this.teardownService = teardownService;
@@ -112,11 +116,15 @@ public final class ShipEntityBreakListener implements Listener {
             stand.getWorld().dropItemNaturally(stand.getLocation(), new ItemStack(hull));
         }
 
+        dropModules(stand, ship);
+
         teardownService.teardown(ship.identity());
         stand.remove();
 
+        int moduleCount = ship.modules().size();
         String recovery = hull != null
-                ? "Recovered Ship Core + " + hull.name() + " from ship."
+                ? "Recovered Ship Core + " + hull.name() + " from ship"
+                        + (moduleCount > 0 ? " + " + moduleCount + " module(s)." : ".")
                 : "Recovered Ship Core from unfinished ship.";
         player.sendMessage(Component.text(recovery, NamedTextColor.GREEN));
     }
@@ -129,6 +137,7 @@ public final class ShipEntityBreakListener implements Listener {
             // Ship destroyed
             Player attacker = damagerAsPlayer(event);
             String id = ship.identity().encoded();
+            dropModules(stand, after);
             try {
                 shipRegistry.transition(ship.identity(), LifecyclePhase.DESTROYED);
             } catch (IllegalStateException ignored) {
@@ -148,6 +157,18 @@ public final class ShipEntityBreakListener implements Listener {
                 "Ship " + shortId(ship.identity()) + " [" + after.currentHp()
                         + "/" + after.maxHp() + " HP]",
                 NamedTextColor.AQUA));
+    }
+
+    /**
+     * Drop every fitted module item at the entity location (RQCA-21-style
+     * conservation: modules are conserved on teardown; V1 also returns them on
+     * destruction — probabilistic wreck recovery is a future slice).
+     */
+    private void dropModules(ArmorStand stand, Ship ship) {
+        for (var entry : ship.modules().entrySet()) {
+            stand.getWorld().dropItemNaturally(
+                    stand.getLocation(), moduleItem.create(entry.getValue()));
+        }
     }
 
     private static @NotNull String shortId(com.glooshy.ships.identity.ShipIdentity id) {

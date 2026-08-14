@@ -2,6 +2,8 @@ package com.glooshy.ships.persistence;
 
 import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.ship.LifecyclePhase;
+import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -75,6 +77,11 @@ public final class YamlShipStore implements ShipStore {
             if (ship.hullMaterial() != null) {
                 entry.put("hullMaterial", ship.hullMaterial().name());
             }
+            if (!ship.modules().isEmpty()) {
+                Map<String, String> modules = new LinkedHashMap<>();
+                ship.modules().forEach((slot, type) -> modules.put(slot.name(), type.name()));
+                entry.put("modules", modules);
+            }
             data.add(entry);
         }
         yaml.set("ships", data);
@@ -108,7 +115,30 @@ public final class YamlShipStore implements ShipStore {
         }
         Object hullRaw = map.get("hullMaterial");
         Material hull = (hullRaw instanceof String hullName) ? Material.matchMaterial(hullName) : null;
-        return new Ship(identity, phase, hull);
+
+        Map<ModuleSlot, ModuleType> modules = new LinkedHashMap<>();
+        Object modulesRaw = map.get("modules");
+        Map<String, Object> modulesMap = modulesRaw instanceof MemorySection section
+                ? section.getValues(false)
+                : (modulesRaw instanceof Map<?, ?> raw ? asStringMap(raw) : null);
+        if (modulesMap != null) {
+            for (Map.Entry<String, Object> e : modulesMap.entrySet()) {
+                try {
+                    modules.put(ModuleSlot.valueOf(e.getKey()), ModuleType.valueOf(String.valueOf(e.getValue())));
+                } catch (IllegalArgumentException ignored) {
+                    // Unknown slot/type from a newer version — skip this entry
+                }
+            }
+        }
+        return new Ship(identity, phase, hull, -1, -1, Map.copyOf(modules));
+    }
+
+    private static Map<String, Object> asStringMap(Map<?, ?> raw) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : raw.entrySet()) {
+            result.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")

@@ -3,7 +3,9 @@ package com.glooshy.ships.ship;
 import com.glooshy.ships.hull.HpCalculator;
 import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.identity.ShipIdentityGenerator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -59,7 +61,8 @@ public final class ShipRegistry {
                                 + " (only UNFINISHED ships accept hull)");
             }
             int maxHp = hullMaterial != null ? hpCalculator.computeMaxHp(hullMaterial.getHardness()) : -1;
-            return new Ship(key, LifecyclePhase.HULL_APPLIED, hullMaterial, maxHp, maxHp);
+            return new Ship(key, LifecyclePhase.HULL_APPLIED, hullMaterial, maxHp, maxHp,
+                    current.modules());
         });
     }
 
@@ -83,7 +86,106 @@ public final class ShipRegistry {
                                 + " (only FINALIZED ships take damage)");
             }
             int newHp = Math.max(0, current.currentHp() - (int) Math.round(amount));
-            return new Ship(key, current.phase(), current.hullMaterial(), newHp, current.maxHp());
+            return new Ship(key, current.phase(), current.hullMaterial(), newHp, current.maxHp(),
+                    current.modules());
+        });
+    }
+
+    /**
+     * Install a module into a slot on a HULL_APPLIED ship (RQCA-08). Returns
+     * the updated ship.
+     *
+     * @throws IllegalStateException if the ship is not found, not in
+     *                               HULL_APPLIED phase, or the slot is occupied
+     */
+    public Ship installModule(ShipIdentity identity, ModuleType type, ModuleSlot slot) {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(slot, "slot");
+        return ships.compute(identity, (key, current) -> {
+            if (current == null) {
+                throw new IllegalStateException("Ship not found: " + identity);
+            }
+            if (current.phase() != LifecyclePhase.HULL_APPLIED) {
+                throw new IllegalStateException(
+                        "Cannot install module on ship in phase " + current.phase()
+                                + " (only HULL_APPLIED ships accept modules)");
+            }
+            if (current.modules().containsKey(slot)) {
+                throw new IllegalStateException(
+                        "Slot " + slot + " is already occupied by a " + current.modules().get(slot));
+            }
+            EnumMap<ModuleSlot, ModuleType> modules = new EnumMap<>(ModuleSlot.class);
+            modules.putAll(current.modules());
+            modules.put(slot, type);
+            return new Ship(key, current.phase(), current.hullMaterial(),
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules));
+        });
+    }
+
+    /**
+     * Remove the module from a slot on a HULL_APPLIED ship (RQCA-08). Returns
+     * the updated ship.
+     *
+     * @throws IllegalStateException if the ship is not found, not in
+     *                               HULL_APPLIED phase, or the slot is empty
+     */
+    public Ship removeModule(ShipIdentity identity, ModuleSlot slot) {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(slot, "slot");
+        return ships.compute(identity, (key, current) -> {
+            if (current == null) {
+                throw new IllegalStateException("Ship not found: " + identity);
+            }
+            if (current.phase() != LifecyclePhase.HULL_APPLIED) {
+                throw new IllegalStateException(
+                        "Cannot remove module from ship in phase " + current.phase()
+                                + " (only HULL_APPLIED ships accept module changes)");
+            }
+            if (!current.modules().containsKey(slot)) {
+                throw new IllegalStateException("Slot " + slot + " is empty");
+            }
+            EnumMap<ModuleSlot, ModuleType> modules = new EnumMap<>(ModuleSlot.class);
+            modules.putAll(current.modules());
+            modules.remove(slot);
+            return new Ship(key, current.phase(), current.hullMaterial(),
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules));
+        });
+    }
+
+    /**
+     * Move the module from one slot to another (free) slot on a HULL_APPLIED
+     * ship (RQCA-08). Returns the updated ship.
+     *
+     * @throws IllegalStateException if the ship is not found, not in
+     *                               HULL_APPLIED phase, the source slot is
+     *                               empty, or the target slot is occupied
+     */
+    public Ship moveModule(ShipIdentity identity, ModuleSlot from, ModuleSlot to) {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+        return ships.compute(identity, (key, current) -> {
+            if (current == null) {
+                throw new IllegalStateException("Ship not found: " + identity);
+            }
+            if (current.phase() != LifecyclePhase.HULL_APPLIED) {
+                throw new IllegalStateException(
+                        "Cannot move module on ship in phase " + current.phase()
+                                + " (only HULL_APPLIED ships accept module changes)");
+            }
+            if (!current.modules().containsKey(from)) {
+                throw new IllegalStateException("Source slot " + from + " is empty");
+            }
+            if (current.modules().containsKey(to)) {
+                throw new IllegalStateException(
+                        "Target slot " + to + " is already occupied by a " + current.modules().get(to));
+            }
+            EnumMap<ModuleSlot, ModuleType> modules = new EnumMap<>(ModuleSlot.class);
+            modules.putAll(current.modules());
+            modules.put(to, modules.remove(from));
+            return new Ship(key, current.phase(), current.hullMaterial(),
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules));
         });
     }
 
@@ -103,7 +205,7 @@ public final class ShipRegistry {
                 return null;
             }
             return new Ship(key, newPhase, current.hullMaterial(),
-                    current.currentHp(), current.maxHp());
+                    current.currentHp(), current.maxHp(), current.modules());
         });
     }
 

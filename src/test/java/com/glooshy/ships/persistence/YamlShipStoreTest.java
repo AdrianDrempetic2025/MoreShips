@@ -145,4 +145,62 @@ class YamlShipStoreTest {
 
         assertEquals(100, loaded.size(), "All 100 ships must survive round-trip");
     }
+
+    /**
+     * FALSIFICATION_PROOF — MODULE_PERSISTENCE_LOSS.
+     *
+     * <p>Mutation plan: drop the modules entry in {@code save} (or ignore it in
+     * {@code deserializeShip}). Expected RED: loaded modules empty.
+     */
+    @Test
+    void save_then_load_preserves_modules() throws IOException {
+        Path file = tempDir.resolve("ships.yml");
+        YamlShipStore store = new YamlShipStore(file);
+
+        Ship ship = new Ship(
+                ShipIdentity.fromUuid(UUID.randomUUID()),
+                LifecyclePhase.HULL_APPLIED,
+                null,
+                -1,
+                -1,
+                java.util.Map.of(
+                        com.glooshy.ships.ship.ModuleSlot.BOW, com.glooshy.ships.ship.ModuleType.CANNON,
+                        com.glooshy.ships.ship.ModuleSlot.STARBOARD, com.glooshy.ships.ship.ModuleType.HELM));
+
+        store.save(List.of(ship));
+
+        List<Ship> loaded = store.load();
+
+        assertEquals(1, loaded.size());
+        Ship restored = loaded.get(0);
+        assertEquals(2, restored.modules().size(),
+                "Fitted modules must survive the save/load round-trip");
+        assertEquals(com.glooshy.ships.ship.ModuleType.CANNON,
+                restored.modules().get(com.glooshy.ships.ship.ModuleSlot.BOW));
+        assertEquals(com.glooshy.ships.ship.ModuleType.HELM,
+                restored.modules().get(com.glooshy.ships.ship.ModuleSlot.STARBOARD));
+    }
+
+    /** Unknown slot/type names in the file are skipped, not fatal. */
+    @Test
+    void load_skips_unknown_module_entries() throws IOException {
+        Path file = tempDir.resolve("ships.yml");
+        Files.writeString(file, """
+                ships:
+                  - identity: "%s"
+                    phase: HULL_APPLIED
+                    modules:
+                      BOW: CARGO
+                      NONEXISTENT_SLOT: CARGO
+                      STERN: NONEXISTENT_TYPE
+                """.formatted(UUID.randomUUID()));
+
+        List<Ship> loaded = new YamlShipStore(file).load();
+
+        assertEquals(1, loaded.size());
+        assertEquals(1, loaded.get(0).modules().size(),
+                "Only the valid module entry survives");
+        assertEquals(com.glooshy.ships.ship.ModuleType.CARGO,
+                loaded.get(0).modules().get(com.glooshy.ships.ship.ModuleSlot.BOW));
+    }
 }
