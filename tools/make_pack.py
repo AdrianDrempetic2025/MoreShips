@@ -64,9 +64,11 @@ def main():
         ymin = min(ys)
         w_px = max(xs) - min(xs)
         l_px = max(zs) - min(zs)
-        sc = min(tw * 16.0 / w_px, tl * 16.0 / l_px)
+        # Artist calibration: spec-footprint fit read too small in world;
+        # final scale is 2x that fit, per Jan's eye
+        sc = 2.0 * min(tw * 16.0 / w_px, tl * 16.0 / l_px)
         whole["display"] = {"head": {
-            "translation": [round(sc * (8 - cx), 3), round(sc * (8 - ymin) - 16, 3), round(sc * (8 - cz), 3)],
+            "translation": [round(sc * (8 - cx), 3), round(sc * (8 - ymin) - 32, 3), round(sc * (8 - cz), 3)],
             "rotation": [0, 0, 0],
             "scale": [round(sc, 4), round(sc, 4), round(sc, 4)],
         }}
