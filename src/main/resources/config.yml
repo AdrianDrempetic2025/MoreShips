@@ -106,3 +106,11 @@ cannons:
   # Shot speed in blocks per tick. Shots have gravity and a slight
   # downward arc so they can reach water-level hulls.
   speed: 2.0
+
+recipes:
+  # Crafting recipes for cores and modules (spec rough - not balanced).
+  # small core  = iron | stick | iron (row)
+  # medium core = wood+iron around 3 small cores
+  # large core  = 2 medium cores + stick (row)
+  # seat = 3 planks row; cargo = planks around chest; cannon = iron around fire charge
+  enabled: true

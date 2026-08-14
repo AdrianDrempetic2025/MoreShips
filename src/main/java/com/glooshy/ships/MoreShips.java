@@ -29,14 +29,17 @@ import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ShipEntitySpawner;
+import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
 import com.glooshy.ships.ship.ShipTeardownService;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -177,6 +180,8 @@ public final class MoreShips extends JavaPlugin {
             getLogger().info("Movement disabled in config.");
         }
 
+        registerRecipes(shipCoreItem, moduleItem, config.recipesEnabled());
+
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener,
                 cargoService, moduleEntities, resolver, modelVisuals);
@@ -188,7 +193,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-29). Cannons online.");
+        getLogger().info("MoreShips enabled (BUILD-30). Cannons + crafting recipes.");
     }
 
     @Override
@@ -198,6 +203,71 @@ public final class MoreShips extends JavaPlugin {
         }
         savePersistedState();
         getLogger().info("MoreShips disabled.");
+    }
+
+    /**
+     * Crafting recipes (spec L1 par2 + par15, rough per spec - not balanced).
+     * Cores: iron+sticks / 3 small+iron+wood / 2 medium+stick. Modules:
+     * simple material recipes. Disable with recipes.enabled=false.
+     */
+    private void registerRecipes(ShipCoreItem cores, ModuleItem modules, boolean enabled) {
+        if (!enabled) {
+            getLogger().info("Crafting recipes disabled in config.");
+            return;
+        }
+
+        addRecipeWithItems(key("small_core"), cores.create(ShipSize.SMALL),
+                new String[]{"ISI"},
+                Map.of('I', new ItemStack(Material.IRON_INGOT),
+                        'S', new ItemStack(Material.STICK)));
+        addRecipeWithItems(key("medium_core"), cores.create(ShipSize.MEDIUM),
+                new String[]{"WIW", "SSS", "WIW"},
+                Map.of('W', new ItemStack(Material.OAK_PLANKS),
+                        'I', new ItemStack(Material.IRON_INGOT),
+                        'S', cores.create(ShipSize.SMALL)));
+        addRecipeWithItems(key("large_core"), cores.create(ShipSize.LARGE),
+                new String[]{"MMS"},
+                Map.of('M', cores.create(ShipSize.MEDIUM),
+                        'S', new ItemStack(Material.STICK)));
+
+        addRecipe(key("seat_module"), modules.create(ModuleType.SEAT), "PPP",
+                Map.of('P', Material.OAK_PLANKS));
+        addRecipe(key("cargo_module"), modules.create(ModuleType.CARGO),
+                new String[]{"PPP", "PCP", "PPP"},
+                Map.of('P', Material.OAK_PLANKS, 'C', Material.CHEST));
+        addRecipe(key("cannon_module"), modules.create(ModuleType.CANNON),
+                new String[]{"III", "IFI", "III"},
+                Map.of('I', Material.IRON_INGOT, 'F', Material.FIRE_CHARGE));
+
+        getLogger().info("Crafting recipes registered (6).");
+    }
+
+    private NamespacedKey key(String name) {
+        return new NamespacedKey(this, name);
+    }
+
+    private void addRecipe(NamespacedKey id, ItemStack result, String shape,
+                           Map<Character, Material> ingredients) {
+        addRecipe(id, result, new String[]{shape}, ingredients);
+    }
+
+    private void addRecipe(NamespacedKey id, ItemStack result, String[] shape,
+                           Map<Character, Material> ingredients) {
+        org.bukkit.inventory.ShapedRecipe recipe =
+                new org.bukkit.inventory.ShapedRecipe(id, result);
+        recipe.shape(shape);
+        ingredients.forEach(recipe::setIngredient);
+        getServer().addRecipe(recipe);
+    }
+
+    /** Recipe whose ingredients are exact items (cores as ingredients). */
+    private void addRecipeWithItems(NamespacedKey id, ItemStack result, String[] shape,
+                                    Map<Character, ItemStack> ingredients) {
+        org.bukkit.inventory.ShapedRecipe recipe =
+                new org.bukkit.inventory.ShapedRecipe(id, result);
+        recipe.shape(shape);
+        ingredients.forEach(recipe::setIngredient);
+        getServer().addRecipe(recipe);
     }
 
     private void loadPersistedState() {

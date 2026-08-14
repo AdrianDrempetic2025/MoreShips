@@ -147,6 +147,10 @@ public final class MoreShipsConfig {
         return config.getString("resourcepack.url", DEFAULT_PACK_URL);
     }
 
+    public boolean recipesEnabled() {
+        return config.getBoolean("recipes.enabled", true);
+    }
+
     public double cannonDamage() {
         return config.getDouble("cannons.damage", 6.0);
     }
