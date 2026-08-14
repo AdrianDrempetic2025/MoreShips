@@ -1,6 +1,7 @@
 {
  "elements": [
   {
+   "name": "HullBody",
    "from": [
     -8,
     -5.05,
@@ -22,6 +23,7 @@
    }
   },
   {
+   "name": "HullFloor",
    "from": [
     -6,
     3.95,
@@ -43,6 +45,7 @@
    }
   },
   {
+   "name": "HullBottonSideRightBelly",
    "from": [
     -0.97937,
     -11.71167,
@@ -64,6 +67,7 @@
    }
   },
   {
+   "name": "HullBottonSideLeftBelly",
    "from": [
     -2.04963,
     -10.61377,
@@ -85,6 +89,7 @@
    }
   },
   {
+   "name": "Leftwall",
    "from": [
     -8,
     4,
@@ -106,6 +111,7 @@
    }
   },
   {
+   "name": "BACk wall",
    "from": [
     -6,
     4,
@@ -127,6 +133,7 @@
    }
   },
   {
+   "name": "BOW wall",
    "from": [
     -6,
     4,
@@ -148,6 +155,7 @@
    }
   },
   {
+   "name": "rightwall",
    "from": [
     22,
     4,
@@ -169,6 +177,7 @@
    }
   },
   {
+   "name": "rightback",
    "from": [
     22.5,
     7,
@@ -190,6 +199,7 @@
    }
   },
   {
+   "name": "rightfront",
    "from": [
     22.5,
     7,
@@ -211,6 +221,7 @@
    }
   },
   {
+   "name": "leftback",
    "from": [
     -8.5,
     7,
@@ -232,6 +243,7 @@
    }
   },
   {
+   "name": "leftfront",
    "from": [
     -8.5,
     7,
@@ -253,6 +265,7 @@
    }
   },
   {
+   "name": "Back",
    "from": [
     -6.6,
     7,
@@ -274,6 +287,7 @@
    }
   },
   {
+   "name": "Front",
    "from": [
     -6.6,
     7,
@@ -295,14 +309,15 @@
    }
   },
   {
+   "name": "SeatMAIN",
    "from": [
     0,
-    3,
+    4,
     0
    ],
    "to": [
     16,
-    5,
+    6,
     16
    ],
    "rotation": {
@@ -310,7 +325,7 @@
     "axis": "y",
     "origin": [
      8,
-     3,
+     4,
      8
     ]
    }
