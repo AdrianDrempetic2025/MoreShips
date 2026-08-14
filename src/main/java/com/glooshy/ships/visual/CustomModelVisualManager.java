@@ -56,8 +56,8 @@ import org.joml.Vector3f;
  */
 public final class CustomModelVisualManager {
 
-    /** One untextured hull cube from the model. */
-    record HullCube(double[] from, double[] to, double angleDeg, double[] rotOrigin) {
+    /** One untextured hull cube from the model (rotation axis included). */
+    record HullCube(double[] from, double[] to, String axis, double angleDeg, double[] rotOrigin) {
         double[] size() {
             return new double[] {(to[0] - from[0]) / 16.0, (to[1] - from[1]) / 16.0,
                     (to[2] - from[2]) / 16.0};
@@ -109,11 +109,15 @@ public final class CustomModelVisualManager {
                 // a hard .get("angle") NPEd here and silently killed the whole
                 // model load (specs stayed empty, nothing ever spawned)
                 double angle = 0;
+                String axis = "y";
                 double[] rotOrigin = {8, 8, 8};
                 if (cube.has("rotation")) {
                     JsonObject rot = cube.getAsJsonObject("rotation");
                     if (rot.has("angle")) {
                         angle = rot.get("angle").getAsDouble();
+                    }
+                    if (rot.has("axis")) {
+                        axis = rot.get("axis").getAsString();
                     }
                     if (rot.has("origin")) {
                         rotOrigin = px(rot.getAsJsonArray("origin"));
@@ -121,7 +125,7 @@ public final class CustomModelVisualManager {
                 }
                 cubes.add(new HullCube(
                         px(cube.getAsJsonArray("from")), px(cube.getAsJsonArray("to")),
-                        angle, rotOrigin));
+                        axis, angle, rotOrigin));
             }
             models.put(size, new ModelSpec(cubes,
                     new NamespacedKey("moreships", trimItemModel)));
@@ -222,11 +226,10 @@ public final class CustomModelVisualManager {
             double[] size = cube.size();
             double[] center = cube.center();
 
-            // Offset of the cube center from the model center, applying the
-            // cube's own rotation about its origin
-            Quaternionf cubeRot = cube.angleDeg() == 0
-                    ? new Quaternionf()
-                    : new Quaternionf().rotationY((float) -Math.toRadians(cube.angleDeg()));
+            // Rigid-body placement: the cube's own rotation (any axis) about its
+            // origin, then the ship's yaw — every cube shares the ship frame,
+            // so the assembly moves and turns as ONE object.
+            Quaternionf cubeRot = axisRotation(cube.axis(), cube.angleDeg());
             Vector3f offset = new Vector3f(
                     (float) (center[0] - cube.rotOrigin()[0]),
                     (float) (center[1] - cube.rotOrigin()[1]),
@@ -236,8 +239,8 @@ public final class CustomModelVisualManager {
                     (float) (cube.rotOrigin()[1] - 8.0),
                     (float) (cube.rotOrigin()[2] - 8.0));
 
-            double[] world = worldOffset(base.getYaw(), offset.x() / 16.0, offset.z() / 16.0);
-            Location target = base.clone().add(world[0], offset.y() / 16.0, world[1]);
+            Vector3f world = new Vector3f(offset).rotate(shipRot).div(16.0f);
+            Location target = base.clone().add(world.x, world.y, world.z);
             if (display.getLocation().distanceSquared(target) > 0.01) {
                 display.teleport(target);
             }
@@ -252,30 +255,32 @@ public final class CustomModelVisualManager {
             display.setTransformation(t);
         }
 
-        // Trim ItemDisplay: centered on the ship, rotated with it
+        // Trim ItemDisplay: teleports WITH the ship (bug: it never moved after
+        // spawn) and rotates with it. Model px [8,8,8] maps to the entity, the
+        // same frame the hull cubes use, so the two layers stay glued.
         int trimIndex = spec.hullCubes.size();
         if (trimIndex < tracked.size()) {
             Entity entity = Bukkit.getEntity(tracked.get(trimIndex));
             if (entity instanceof ItemDisplay display && !display.isDead()) {
-                // Model spans [-16..32]px; origin of the rendered model sits at
-                // the entity, so shift by half the model unit to center it.
+                if (display.getLocation().distanceSquared(base) > 0.01) {
+                    display.teleport(base);
+                }
+                Vector3f transl = new Vector3f(-0.5f, -0.5f, -0.5f).rotate(shipRot);
                 Transformation t = new Transformation(
-                        new Vector3f(0.0f, 0.0f, 0.0f),
-                        new Quaternionf(shipRot),
-                        new Vector3f(1.0f, 1.0f, 1.0f),
-                        new Quaternionf());
+                        transl, new Quaternionf(shipRot),
+                        new Vector3f(1.0f, 1.0f, 1.0f), new Quaternionf());
                 display.setTransformation(t);
             }
         }
     }
 
-    private static double[] worldOffset(double yawDegrees, double localX, double localZ) {
-        double yawRad = Math.toRadians(yawDegrees);
-        double sin = Math.sin(yawRad);
-        double cos = Math.cos(yawRad);
-        double dx = -cos * localX - sin * localZ;
-        double dz = -sin * localX + cos * localZ;
-        return new double[] {dx, dz};
+    private static Quaternionf axisRotation(String axis, double angleDeg) {
+        float rad = (float) -Math.toRadians(angleDeg);
+        return switch (axis == null ? "y" : axis) {
+            case "x" -> new Quaternionf().rotationX(rad);
+            case "z" -> new Quaternionf().rotationZ(rad);
+            default -> new Quaternionf().rotationY(rad);
+        };
     }
 
     /** Remove the custom visuals of a ship. */
