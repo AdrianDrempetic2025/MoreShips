@@ -12,7 +12,7 @@ import json, os, shutil, sys, zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZES = {
     # name: (model, texture, item-model, target_w_blocks, target_l_blocks)
-    "small": ("small_ship_hull.json", "small_ship_metal_coat.png", "ship_small_trim", 2, 3),
+    "small": ("small_ship_hull.json", "small_ship.png", "ship_small_trim", 2, 3),
     # add medium/large here as models arrive
 }
 
@@ -41,7 +41,7 @@ def main():
         # entities render raw.
         whole = {
             "credit": m.get("credit", ""),
-            "texture_size": [64, 64],
+            "texture_size": [256, 256],
             "textures": {"0": tex_ref, "particle": tex_ref},
             "elements": [],
         }
