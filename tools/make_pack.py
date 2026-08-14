@@ -16,6 +16,94 @@ SIZES = {
     # add medium/large here as models arrive
 }
 
+# UV remap onto Jan's painted 256x256 atlas (px coords). The artist's auto
+# UVs sampled outside the painted regions (e.g. rails to px x=208 where
+# paint stops at 130 -> gray stripes) and predate the atlas redesign.
+# Layout: deck/hull -> big tan region (0-130)^2, walls -> strip y130-155,
+# rails -> strip x160-230, seat top -> white square (130-155)^2.
+# Rects are disjoint, 1 px per model unit (no stretching).
+UV_ATLAS = {
+    "small": {
+        "HullBody": {
+            "up": (0, 0, 32, 46), "down": (34, 0, 66, 46),
+            "north": (68, 0, 114, 9), "south": (68, 11, 114, 20),
+            "east": (68, 22, 100, 31), "west": (68, 33, 100, 42),
+        },
+        "HullFloor": {
+            "up": (0, 48, 28, 92), "down": (30, 48, 58, 92),
+            "north": (60, 48, 104, 53), "south": (60, 55, 104, 60),
+            "east": (60, 62, 88, 67), "west": (60, 69, 88, 74),
+        },
+        "HullBottonSideRightBelly": {
+            "north": (0, 94, 19, 103), "south": (21, 94, 40, 103),
+            "east": (42, 94, 88, 103), "west": (42, 105, 88, 114),
+            "up": (90, 62, 109, 108), "down": (111, 62, 129, 108),
+        },
+        "HullBottonSideLeftBelly": {
+            "north": (0, 94, 19, 103), "south": (21, 94, 40, 103),
+            "east": (42, 94, 88, 103), "west": (42, 105, 88, 114),
+            "up": (90, 62, 109, 108), "down": (111, 62, 129, 108),
+        },
+        "Leftwall": {
+            "east": (0, 130, 46, 134), "west": (48, 130, 94, 134),
+            "north": (96, 130, 98, 134), "south": (100, 130, 102, 134),
+            "up": (0, 136, 46, 138), "down": (48, 136, 94, 138),
+        },
+        "rightwall": {
+            "east": (0, 130, 46, 134), "west": (48, 130, 94, 134),
+            "north": (96, 130, 98, 134), "south": (100, 130, 102, 134),
+            "up": (0, 136, 46, 138), "down": (48, 136, 94, 138),
+        },
+        "BACk wall": {
+            "north": (0, 140, 28, 144), "south": (30, 140, 58, 144),
+            "east": (60, 140, 62, 144), "west": (64, 140, 66, 144),
+            "up": (68, 140, 96, 142), "down": (98, 140, 126, 142),
+        },
+        "BOW wall": {
+            "north": (0, 140, 28, 144), "south": (30, 140, 58, 144),
+            "east": (60, 140, 62, 144), "west": (64, 140, 66, 144),
+            "up": (68, 140, 96, 142), "down": (98, 140, 126, 142),
+        },
+        "SeatMAIN": {
+            "up": (130, 130, 146, 146), "down": (130, 130, 146, 146),
+            "north": (0, 146, 16, 148), "east": (0, 146, 16, 148),
+            "south": (0, 146, 16, 148), "west": (0, 146, 16, 148),
+        },
+        # rails (rightback/rightfront/leftback/leftfront): long faces share
+        # one strip, caps share a 2x2 square
+        "rightback": {
+            "east": (160, 130, 184, 132), "west": (160, 130, 184, 132),
+            "up": (160, 130, 184, 132), "down": (160, 130, 184, 132),
+            "north": (186, 130, 188, 132), "south": (186, 130, 188, 132),
+        },
+        "rightfront": {
+            "east": (160, 130, 184, 132), "west": (160, 130, 184, 132),
+            "up": (160, 130, 184, 132), "down": (160, 130, 184, 132),
+            "north": (186, 130, 188, 132), "south": (186, 130, 188, 132),
+        },
+        "leftback": {
+            "east": (160, 130, 184, 132), "west": (160, 130, 184, 132),
+            "up": (160, 130, 184, 132), "down": (160, 130, 184, 132),
+            "north": (186, 130, 188, 132), "south": (186, 130, 188, 132),
+        },
+        "leftfront": {
+            "east": (160, 130, 184, 132), "west": (160, 130, 184, 132),
+            "up": (160, 130, 184, 132), "down": (160, 130, 184, 132),
+            "north": (186, 130, 188, 132), "south": (186, 130, 188, 132),
+        },
+        "Back": {
+            "north": (160, 134, 190, 136), "south": (192, 134, 222, 136),
+            "east": (224, 134, 226, 136), "west": (224, 134, 226, 136),
+            "up": (160, 138, 190, 140), "down": (192, 138, 222, 140),
+        },
+        "Front": {
+            "north": (160, 134, 190, 136), "south": (192, 134, 222, 136),
+            "east": (224, 134, 226, 136), "west": (224, 134, 226, 136),
+            "up": (160, 138, 190, 140), "down": (192, 138, 222, 140),
+        },
+    },
+}
+
 def main():
     pack = os.path.join(ROOT, "build", "pack")
     if os.path.isdir(pack):
@@ -33,6 +121,14 @@ def main():
             print(f"skip {size}: {src} missing")
             continue
         m = json.load(open(src, encoding="utf-8"))
+        atlas = UV_ATLAS.get(size)
+        if atlas:
+            for el in m["elements"]:
+                remap = atlas.get(el.get("name", ""))
+                if not remap:
+                    continue
+                for face, rect in remap.items():
+                    el.setdefault("faces", {})[face]["uv"] = [round(c / 16.0, 4) for c in rect]
         tex_ref = f"moreships:item/{os.path.splitext(texture)[0]}"
         # Bake the WHOLE model (all cubes). Faces the artist left untextured
         # (#missing) get the artist's texture too — one rigid client-rendered
