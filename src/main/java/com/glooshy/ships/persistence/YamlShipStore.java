@@ -87,12 +87,16 @@ public final class YamlShipStore implements ShipStore {
                 entry.put("modules", modules);
             }
             if (!ship.cargo().isEmpty()) {
-                List<Map<String, Object>> cargo = new ArrayList<>(ship.cargo().size());
-                ship.cargo().forEach((slot, item) -> {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("slot", slot);
-                    row.put("item", item);
-                    cargo.add(row);
+                Map<String, List<Map<String, Object>>> cargo = new LinkedHashMap<>();
+                ship.cargo().forEach((moduleSlot, hold) -> {
+                    List<Map<String, Object>> rows = new ArrayList<>(hold.size());
+                    hold.forEach((index, item) -> {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        row.put("slot", index);
+                        row.put("item", item);
+                        rows.add(row);
+                    });
+                    cargo.put(moduleSlot.name(), rows);
                 });
                 entry.put("cargo", cargo);
             }
@@ -147,21 +151,37 @@ public final class YamlShipStore implements ShipStore {
                 }
             }
         }
-        Map<Integer, Map<String, Object>> cargo = new LinkedHashMap<>();
+        Map<ModuleSlot, Map<Integer, Map<String, Object>>> cargo = new LinkedHashMap<>();
         Object cargoRaw = map.get("cargo");
-        if (cargoRaw instanceof List<?> rows) {
-            for (Object row : rows) {
-                Map<String, Object> rowMap = row instanceof MemorySection section
-                        ? section.getValues(false)
-                        : (row instanceof Map<?, ?> raw ? asStringMap(raw) : null);
-                if (rowMap == null) {
+        Map<String, Object> holdsBySlot = cargoRaw instanceof MemorySection section
+                ? section.getValues(false)
+                : (cargoRaw instanceof Map<?, ?> raw ? asStringMap(raw) : null);
+        if (holdsBySlot != null) {
+            for (Map.Entry<String, Object> holdEntry : holdsBySlot.entrySet()) {
+                ModuleSlot moduleSlot;
+                try {
+                    moduleSlot = ModuleSlot.valueOf(holdEntry.getKey());
+                } catch (IllegalArgumentException e) {
                     continue;
                 }
-                if (!(rowMap.get("slot") instanceof Number slot)
-                        || !(rowMap.get("item") instanceof Map<?, ?>)) {
+                if (!(holdEntry.getValue() instanceof List<?> rows)) {
                     continue;
                 }
-                cargo.put(slot.intValue(), asStringMap((Map<?, ?>) rowMap.get("item")));
+                Map<Integer, Map<String, Object>> hold = new LinkedHashMap<>();
+                for (Object row : rows) {
+                    Map<String, Object> rowMap = row instanceof MemorySection rowSection
+                            ? rowSection.getValues(false)
+                            : (row instanceof Map<?, ?> raw ? asStringMap(raw) : null);
+                    if (rowMap == null) {
+                        continue;
+                    }
+                    if (!(rowMap.get("slot") instanceof Number index)
+                            || !(rowMap.get("item") instanceof Map<?, ?>)) {
+                        continue;
+                    }
+                    hold.put(index.intValue(), asStringMap((Map<?, ?>) rowMap.get("item")));
+                }
+                cargo.put(moduleSlot, hold);
             }
         }
 

@@ -176,12 +176,12 @@ public final class ShipEntityBreakListener implements Listener {
      * conserved on teardown and destruction).
      */
     private void dropCargo(ArmorStand stand, Ship ship) {
-        ship.cargo().values().forEach(itemMap -> {
+        ship.cargo().values().forEach(hold -> hold.values().forEach(itemMap -> {
             org.bukkit.inventory.ItemStack item = cargoService.deserializeItem(itemMap);
             if (item != null) {
                 stand.getWorld().dropItemNaturally(stand.getLocation(), item);
             }
-        });
+        }));
     }
 
     /**

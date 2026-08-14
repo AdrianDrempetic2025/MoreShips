@@ -8,6 +8,7 @@ import com.glooshy.ships.ship.ModuleSlot;
 import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
+import java.util.Map;
 import java.util.Optional;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -76,7 +77,7 @@ public final class ModuleEntityListener implements Listener {
         }
 
         switch (type) {
-            case CARGO -> cargoService.open(player, ship);
+            case CARGO -> cargoService.open(player, ship, slot);
             case SEAT -> {
                 if (!stand.getPassengers().isEmpty()) {
                     player.sendMessage(Component.text(
@@ -126,6 +127,16 @@ public final class ModuleEntityListener implements Listener {
         ModuleType removed = ship.modules().get(slot);
         if (removed == null) {
             return;
+        }
+        // RQCA-22: a removed cargo module drops its hold contents (conservation)
+        Map<Integer, Map<String, Object>> hold = ship.cargo().get(slot);
+        if (hold != null) {
+            hold.values().forEach(itemMap -> {
+                org.bukkit.inventory.ItemStack item = cargoService.deserializeItem(itemMap);
+                if (item != null) {
+                    stand.getWorld().dropItemNaturally(stand.getLocation(), item);
+                }
+            });
         }
         shipRegistry.removeModule(binding.get().shipId(), slot);
         stand.getWorld().dropItemNaturally(

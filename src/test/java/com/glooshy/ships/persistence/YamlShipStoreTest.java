@@ -216,16 +216,23 @@ class YamlShipStoreTest {
         Path file = tempDir.resolve("ships.yml");
         YamlShipStore store = new YamlShipStore(file);
 
-        Map<Integer, Map<String, Object>> cargo = Map.of(
+        Map<Integer, Map<String, Object>> bowHold = Map.of(
                 0, Map.of("type", "STONE", "amount", 3),
                 26, Map.of("type", "DIAMOND", "amount", 1));
+        Map<Integer, Map<String, Object>> sternHold = Map.of(
+                5, Map.of("type", "GOLD_INGOT"));
+        Map<com.glooshy.ships.ship.ModuleSlot, Map<Integer, Map<String, Object>>> cargo = Map.of(
+                com.glooshy.ships.ship.ModuleSlot.BOW, bowHold,
+                com.glooshy.ships.ship.ModuleSlot.STERN, sternHold);
         Ship ship = new Ship(
                 ShipIdentity.fromUuid(UUID.randomUUID()),
                 LifecyclePhase.FINALIZED,
                 null,
                 18,
                 20,
-                java.util.Map.of(com.glooshy.ships.ship.ModuleSlot.BOW, com.glooshy.ships.ship.ModuleType.CARGO),
+                java.util.Map.of(
+                        com.glooshy.ships.ship.ModuleSlot.BOW, com.glooshy.ships.ship.ModuleType.CARGO,
+                        com.glooshy.ships.ship.ModuleSlot.STERN, com.glooshy.ships.ship.ModuleType.CARGO),
                 cargo);
 
         store.save(List.of(ship));
@@ -234,8 +241,10 @@ class YamlShipStoreTest {
 
         assertEquals(1, loaded.size());
         Ship restored = loaded.get(0);
-        assertEquals(cargo, restored.cargo(),
-                "Cargo contents must survive the save/load round-trip");
+        assertEquals(bowHold, restored.cargo().get(com.glooshy.ships.ship.ModuleSlot.BOW),
+                "BOW hold must survive the round-trip");
+        assertEquals(sternHold, restored.cargo().get(com.glooshy.ships.ship.ModuleSlot.STERN),
+                "STERN hold must survive the round-trip independently");
     }
 
     /**

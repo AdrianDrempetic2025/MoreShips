@@ -184,8 +184,16 @@ public final class ShipRegistry {
             EnumMap<ModuleSlot, ModuleType> modules = new EnumMap<>(ModuleSlot.class);
             modules.putAll(current.modules());
             modules.put(to, modules.remove(from));
+            // The module's cargo hold travels with the module
+            Map<ModuleSlot, Map<Integer, Map<String, Object>>> cargo =
+                    new EnumMap<>(ModuleSlot.class);
+            cargo.putAll(current.cargo());
+            Map<Integer, Map<String, Object>> hold = cargo.remove(from);
+            if (hold != null) {
+                cargo.put(to, hold);
+            }
             return new Ship(key, current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), Map.copyOf(modules), current.cargo());
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules), Map.copyOf(cargo));
         });
     }
 
@@ -210,18 +218,24 @@ public final class ShipRegistry {
     }
 
     /**
-     * Replace the full cargo contents of a live ship (RQCA-21/22). Bulk
-     * setter — the caller serializes the whole inventory and hands it over.
+     * Replace the cargo hold of one module slot (RQCA-21/22). Bulk setter —
+     * the caller serializes the whole inventory and hands it over.
      *
      * @throws IllegalStateException if the ship is not found
      */
-    public Ship setCargo(ShipIdentity identity, Map<Integer, Map<String, Object>> cargo) {
+    public Ship setCargo(ShipIdentity identity, ModuleSlot slot,
+                         Map<Integer, Map<String, Object>> contents) {
         Objects.requireNonNull(identity, "identity");
-        Objects.requireNonNull(cargo, "cargo");
+        Objects.requireNonNull(slot, "slot");
+        Objects.requireNonNull(contents, "contents");
         return ships.compute(identity, (key, current) -> {
             if (current == null) {
                 throw new IllegalStateException("Ship not found: " + identity);
             }
+            Map<ModuleSlot, Map<Integer, Map<String, Object>>> cargo =
+                    new EnumMap<>(ModuleSlot.class);
+            cargo.putAll(current.cargo());
+            cargo.put(slot, Map.copyOf(contents));
             return new Ship(key, current.phase(), current.hullMaterial(),
                     current.currentHp(), current.maxHp(), current.modules(),
                     Map.copyOf(cargo));

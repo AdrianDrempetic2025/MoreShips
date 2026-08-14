@@ -1,5 +1,7 @@
 package com.glooshy.ships.cargo;
 
+import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
 import java.util.HashMap;
@@ -11,11 +13,11 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * Opens and saves a ship's cargo inventory (RQCA-21/22).
+ * Opens and saves a ship's per-module cargo holds (RQCA-21/22).
  *
- * <p>One shared 27-slot cargo per ship, available when the ship has at least
- * one fitted CARGO module and is in a pre-destruction phase. Bukkit-side
- * conversion between ItemStack and the raw-map domain form lives here.
+ * <p>Every fitted CARGO module has its own 27-slot hold, opened by
+ * right-clicking that module's entity. Bukkit-side conversion between
+ * ItemStack and the raw-map domain form lives here.
  */
 public final class CargoService {
 
@@ -25,27 +27,28 @@ public final class CargoService {
         this.shipRegistry = shipRegistry;
     }
 
-    /** Open the cargo inventory of the given ship for the player. */
-    public void open(Player player, Ship ship) {
-        if (!ship.hasCargoModule()) {
+    /** Open the cargo hold of one specific cargo module for the player. */
+    public void open(Player player, Ship ship, ModuleSlot slot) {
+        ModuleType type = ship.modules().get(slot);
+        if (type != ModuleType.CARGO) {
             player.sendMessage(Component.text(
-                    "This ship has no cargo module fitted.", NamedTextColor.RED));
+                    "No cargo module in slot " + slot.name().toLowerCase() + ".",
+                    NamedTextColor.RED));
             return;
         }
 
         Inventory inventory = player.getServer().createInventory(
-                new CargoHolder(ship.identity()),
-                Ship.cargoSize(),
-                Component.text("Ship Cargo", NamedTextColor.GOLD));
+                new CargoHolder(ship.identity(), slot),
+                Ship.cargoHoldSize(),
+                Component.text("Cargo " + slot.name(), NamedTextColor.GOLD));
 
-        ship.cargo().forEach((slot, itemMap) -> {
-            if (slot < 0 || slot >= Ship.cargoSize()) {
+        ship.cargo().getOrDefault(slot, Map.of()).forEach((index, itemMap) -> {
+            if (index < 0 || index >= Ship.cargoHoldSize()) {
                 return;
             }
-            try {
-                inventory.setItem(slot, ItemStack.deserialize(itemMap));
-            } catch (IllegalArgumentException | IllegalStateException ignored) {
-                // Unreadable item from an older/manual edit — skip, never block opening
+            ItemStack item = deserializeItem(itemMap);
+            if (item != null) {
+                inventory.setItem(index, item);
             }
         });
 
@@ -53,20 +56,20 @@ public final class CargoService {
     }
 
     /**
-     * Persist the inventory contents back onto the ship. Called on inventory
-     * close. Returns true if the ship was still live.
+     * Persist the inventory contents back onto the module slot. Called on
+     * inventory close. Returns true if the ship was still live.
      */
     public boolean save(CargoHolder holder, Inventory inventory) {
-        Map<Integer, Map<String, Object>> cargo = new HashMap<>();
-        for (int slot = 0; slot < inventory.getSize(); slot++) {
-            ItemStack item = inventory.getItem(slot);
+        Map<Integer, Map<String, Object>> contents = new HashMap<>();
+        for (int index = 0; index < inventory.getSize(); index++) {
+            ItemStack item = inventory.getItem(index);
             if (item == null || item.getType().isAir()) {
                 continue;
             }
-            cargo.put(slot, item.serialize());
+            contents.put(index, item.serialize());
         }
         try {
-            shipRegistry.setCargo(holder.shipId(), cargo);
+            shipRegistry.setCargo(holder.shipId(), holder.slot(), contents);
             return true;
         } catch (IllegalStateException e) {
             return false; // Ship destroyed between open and close

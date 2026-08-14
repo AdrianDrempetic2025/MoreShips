@@ -13,6 +13,7 @@ import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import net.kyori.adventure.text.Component;
@@ -221,6 +222,16 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                             "Slot " + slot.name().toLowerCase() + " is empty.", NamedTextColor.RED));
                     return;
                 }
+                // RQCA-22: a removed cargo module drops its hold contents
+                Map<Integer, Map<String, Object>> hold = ship.cargo().get(slot);
+                if (hold != null && target instanceof ArmorStand stand) {
+                    hold.values().forEach(itemMap -> {
+                        org.bukkit.inventory.ItemStack item = cargoService.deserializeItem(itemMap);
+                        if (item != null) {
+                            stand.getWorld().dropItemNaturally(stand.getLocation(), item);
+                        }
+                    });
+                }
                 shipRegistry.removeModule(shipId, slot);
                 moduleEntities.despawn(shipId, slot);
                 if (target instanceof ArmorStand stand) {
@@ -400,7 +411,19 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                     NamedTextColor.RED));
             return;
         }
-        cargoService.open(player, ship);
+        // Admin convenience: opens the first cargo module's hold;
+        // right-clicking a specific cargo module opens that one.
+        ModuleSlot firstCargo = ship.modules().entrySet().stream()
+                .filter(e -> e.getValue() == ModuleType.CARGO)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
+        if (firstCargo == null) {
+            player.sendMessage(Component.text(
+                    "This ship has no cargo module fitted.", NamedTextColor.RED));
+            return;
+        }
+        cargoService.open(player, ship, firstCargo);
     }
 
     private static String shortId(com.glooshy.ships.identity.ShipIdentity id) {
