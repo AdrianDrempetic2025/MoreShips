@@ -135,8 +135,16 @@ public final class MoreShipsConfig {
         return -Math.abs(config.getDouble("physics.sinkVelocity", 0.30));
     }
 
+    /**
+     * Compiled-in fallback: pre-0.14 servers carry an old config.yml without
+     * the resourcepack section, and saveDefaultConfig never overwrites it —
+     * an empty default would silently disable the pack push entirely.
+     */
+    private static final String DEFAULT_PACK_URL =
+            "http://192.168.1.12:8765/MoreShips-pack.zip";
+
     public String resourcePackUrl() {
-        return config.getString("resourcepack.url", "");
+        return config.getString("resourcepack.url", DEFAULT_PACK_URL);
     }
 
     public boolean collisionEnabled() {
