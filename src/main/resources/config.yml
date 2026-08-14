@@ -114,3 +114,20 @@ recipes:
   # large core  = 2 medium cores + stick (row)
   # seat = 3 planks row; cargo = planks around chest; cannon = iron around fire charge
   enabled: true
+
+stats:
+  # Module-driven statistics (CON-10/11, RQCA-07).
+  # Speed multiplier per ship = 1 - modules*weight + engines*boost - hardness*penalty
+  # (clamped 0.4..1.6). Health modules add healthBonus max HP each.
+  weightPerModule: 0.05
+  engineBoost: 0.15
+  hardnessPenalty: 0.002
+  healthBonus: 10
+
+modules:
+  engine:
+    material: FURNACE
+    displayName: "Engine Module"
+  health:
+    material: GOLDEN_APPLE
+    displayName: "Health Module"

@@ -35,9 +35,16 @@ public final class ShipRegistry {
     private final HpCalculator hpCalculator;
     private final ConcurrentMap<ShipIdentity, Ship> ships = new ConcurrentHashMap<>();
 
+    private int healthBonusPerModule = 0;
+
     public ShipRegistry(ShipIdentityGenerator generator, HpCalculator hpCalculator) {
         this.generator = Objects.requireNonNull(generator, "generator");
         this.hpCalculator = Objects.requireNonNull(hpCalculator, "hpCalculator");
+    }
+
+    /** CON-11: how much max HP one HEALTH module adds while fitted. */
+    public void setHealthBonusPerModule(int bonus) {
+        this.healthBonusPerModule = bonus;
     }
 
     public Ship createShip(ShipSize size) {
@@ -129,8 +136,14 @@ public final class ShipRegistry {
             }
             Map<ModulePos, ModuleType> modules = new HashMap<>(current.modules());
             modules.put(pos, type);
+            int maxHp = current.maxHp();
+            int currentHp = current.currentHp();
+            if (type == ModuleType.HEALTH) {
+                maxHp += healthBonusPerModule;
+                currentHp = currentHp < 0 ? currentHp : currentHp + healthBonusPerModule;
+            }
             return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), Map.copyOf(modules), current.cargo());
+                    currentHp, maxHp, Map.copyOf(modules), current.cargo());
         });
     }
 
@@ -157,13 +170,19 @@ public final class ShipRegistry {
                 throw new IllegalStateException("Position " + pos.encoded() + " is empty");
             }
             Map<ModulePos, ModuleType> modules = new HashMap<>(current.modules());
-            modules.remove(pos);
+            ModuleType removedType = modules.remove(pos);
             // A removed cargo module takes its hold out of the ship state; the
             // interaction layer drops the contents (RQCA-22).
             Map<ModulePos, Map<Integer, Map<String, Object>>> cargo = new HashMap<>(current.cargo());
             cargo.remove(pos);
+            int maxHp = current.maxHp();
+            int currentHp = current.currentHp();
+            if (removedType == ModuleType.HEALTH) {
+                maxHp -= healthBonusPerModule;
+                currentHp = Math.min(currentHp, maxHp);
+            }
             return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), Map.copyOf(modules), Map.copyOf(cargo));
+                    currentHp, maxHp, Map.copyOf(modules), Map.copyOf(cargo));
         });
     }
 

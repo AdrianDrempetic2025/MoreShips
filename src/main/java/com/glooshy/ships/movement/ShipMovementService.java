@@ -73,6 +73,9 @@ public final class ShipMovementService implements Runnable {
     private final double maxSpeed;
     private final double acceleration;
     private final double friction;
+    private final double weightPerModule;
+    private final double engineBoost;
+    private final double hardnessPenalty;
 
     private final Map<ShipIdentity, ShipMovement> movements = new ConcurrentHashMap<>();
     private volatile BukkitTask task;
@@ -93,7 +96,10 @@ public final class ShipMovementService implements Runnable {
             double friction,
             double riseVelocity,
             double sinkVelocity,
-            double turnRateDeg) {
+            double turnRateDeg,
+            double weightPerModule,
+            double engineBoost,
+            double hardnessPenalty) {
         this.plugin = plugin;
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
@@ -109,6 +115,9 @@ public final class ShipMovementService implements Runnable {
         this.collisionEnabled = collisionEnabled;
         this.collisionMargin = collisionMargin;
         this.turnRateDeg = turnRateDeg;
+        this.weightPerModule = weightPerModule;
+        this.engineBoost = engineBoost;
+        this.hardnessPenalty = hardnessPenalty;
     }
 
     public synchronized void start() {
@@ -177,8 +186,17 @@ public final class ShipMovementService implements Runnable {
             }
 
             if (ship.phase() == LifecyclePhase.FINALIZED) {
+                // CON-10/11 + RQCA-07: module weight slows, engines boost,
+                // harder hulls are tougher but slower
+                double effectiveMax = maxSpeed * com.glooshy.ships.ship.ShipStats.speedMultiplier(
+                        ship.modules().size(),
+                        com.glooshy.ships.ship.ShipStats.countType(ship.modules(),
+                                com.glooshy.ships.ship.ModuleType.ENGINE),
+                        ship.hullMaterial() != null ? ship.hullMaterial().getHardness() : 0.0,
+                        weightPerModule, engineBoost, hardnessPenalty);
                 ShipMovement movement = movements.computeIfAbsent(
-                        shipId, k -> new ShipMovement(maxSpeed, acceleration, friction));
+                        shipId, k -> new ShipMovement(effectiveMax, acceleration, friction));
+                movement.setMaxSpeed(effectiveMax);
 
                 Player pilot = findPilot(entity);
                 if (pilot != null) {

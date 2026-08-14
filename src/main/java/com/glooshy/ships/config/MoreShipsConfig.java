@@ -147,6 +147,22 @@ public final class MoreShipsConfig {
         return config.getString("resourcepack.url", DEFAULT_PACK_URL);
     }
 
+    public double statsWeightPerModule() {
+        return config.getDouble("stats.weightPerModule", 0.05);
+    }
+
+    public double statsEngineBoost() {
+        return config.getDouble("stats.engineBoost", 0.15);
+    }
+
+    public double statsHardnessPenalty() {
+        return config.getDouble("stats.hardnessPenalty", 0.002);
+    }
+
+    public int statsHealthBonus() {
+        return config.getInt("stats.healthBonus", 10);
+    }
+
     public boolean recipesEnabled() {
         return config.getBoolean("recipes.enabled", true);
     }
@@ -174,7 +190,9 @@ public final class MoreShipsConfig {
     private static final Map<ModuleType, Material> DEFAULT_MODULE_MATERIALS = Map.of(
             ModuleType.SEAT, Material.OAK_STAIRS,
             ModuleType.CARGO, Material.CHEST,
-            ModuleType.CANNON, Material.DISPENSER);
+            ModuleType.CANNON, Material.DISPENSER,
+            ModuleType.ENGINE, Material.FURNACE,
+            ModuleType.HEALTH, Material.GOLDEN_APPLE);
 
     public @NotNull Material moduleMaterial(@NotNull ModuleType type) {
         String name = config.getString("modules." + type.name().toLowerCase() + ".material");

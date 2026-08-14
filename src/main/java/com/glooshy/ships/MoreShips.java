@@ -87,6 +87,7 @@ public final class MoreShips extends JavaPlugin {
                 config.moduleMaterials(),
                 config.moduleDisplayNames());
         shipRegistry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(config.hpMultiplier()));
+        shipRegistry.setHealthBonusPerModule(config.statsHealthBonus());
         org.bukkit.NamespacedKey modelItemKey = new org.bukkit.NamespacedKey("moreships", "ship_small_trim");
         ShipEntitySpawner entitySpawner = new ShipEntitySpawner(shipIdKey, modelItemKey);
         bindingRegistry = new RuntimeBindingRegistry();
@@ -173,7 +174,10 @@ public final class MoreShips extends JavaPlugin {
                     config.movementFriction(),
                     config.physicsRiseVelocity(),
                     config.physicsSinkVelocity(),
-                    config.movementTurnRate());
+                    config.movementTurnRate(),
+                    config.statsWeightPerModule(),
+                    config.statsEngineBoost(),
+                    config.statsHardnessPenalty());
             movementService.start();
             getLogger().info("Movement service started: maxSpeed=" + config.movementMaxSpeed()
                     + " accel=" + config.movementAcceleration()
@@ -195,7 +199,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-31). Reverse + sprint boost + reload.");
+        getLogger().info("MoreShips enabled (BUILD-32). Module stats + engine/health modules.");
     }
 
     @Override
@@ -240,8 +244,13 @@ public final class MoreShips extends JavaPlugin {
         addRecipe(key("cannon_module"), modules.create(ModuleType.CANNON),
                 new String[]{"III", "IFI", "III"},
                 Map.of('I', Material.IRON_INGOT, 'F', Material.FIRE_CHARGE));
+        addRecipe(key("engine_module"), modules.create(ModuleType.ENGINE), "IRI",
+                Map.of('I', Material.IRON_INGOT, 'R', Material.REDSTONE));
+        addRecipe(key("health_module"), modules.create(ModuleType.HEALTH),
+                new String[]{"III", "IGI", "III"},
+                Map.of('I', Material.IRON_INGOT, 'G', Material.GOLDEN_APPLE));
 
-        getLogger().info("Crafting recipes registered (6).");
+        getLogger().info("Crafting recipes registered (8).");
     }
 
     private NamespacedKey key(String name) {

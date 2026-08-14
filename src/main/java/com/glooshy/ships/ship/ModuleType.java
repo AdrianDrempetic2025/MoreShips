@@ -13,5 +13,9 @@ package com.glooshy.ships.ship;
 public enum ModuleType {
     SEAT,
     CARGO,
-    CANNON
+    CANNON,
+    /** Boosts speed (CON-10: module weight/propulsion affects ship speed). */
+    ENGINE,
+    /** Adds bonus max HP while fitted (CON-11: module-driven statistics). */
+    HEALTH
 }
