@@ -57,8 +57,10 @@ class HullShapeTest {
 
     @Test
     void bow_cell_is_forward_stern_cell_is_behind() {
-        HullShape.Cell bow = new HullShape.Cell(0, 0);
-        HullShape.Cell stern = new HullShape.Cell(0, ShipSize.MEDIUM.length() - 1);
+        HullShape.Cell bow = HullShape.solidCells(ShipSize.MEDIUM).stream()
+                .max(java.util.Comparator.comparingDouble(HullShape.Cell::localZ)).orElseThrow();
+        HullShape.Cell stern = HullShape.solidCells(ShipSize.MEDIUM).stream()
+                .min(java.util.Comparator.comparingDouble(HullShape.Cell::localZ)).orElseThrow();
         assertTrue(bow.localZ() > 0);
         assertTrue(stern.localZ() < 0);
     }

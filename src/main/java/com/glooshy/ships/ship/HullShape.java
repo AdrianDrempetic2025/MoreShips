@@ -28,7 +28,9 @@ public final class HullShape {
     public static List<Double> segmentCentersZ(ShipSize size) {
         double l = size.length();
         double s = segmentSize(size);
-        int n = Math.max(1, (int) Math.round(l / s));
+        // -0.3 slack: a medium hull (4 long, ~3-wide segments) still gets 2
+        // segments instead of one under-covering square
+        int n = Math.max(1, (int) Math.ceil(l / s - 0.3));
         List<Double> centers = new ArrayList<>(n);
         double first = -l / 2.0 + s / 2.0;
         double last = l / 2.0 - s / 2.0;
