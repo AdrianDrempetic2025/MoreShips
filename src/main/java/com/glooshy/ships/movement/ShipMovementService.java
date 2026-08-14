@@ -63,6 +63,7 @@ public final class ShipMovementService implements Runnable {
     private final ShipHitboxManager hitboxes;
     private final org.bukkit.NamespacedKey shipIdKey;
     private final WaterPhysics waterPhysics;
+    private final CollisionBox collision;
     private final double maxSpeed;
     private final double acceleration;
     private final double friction;
@@ -78,6 +79,10 @@ public final class ShipMovementService implements Runnable {
             @NotNull ShipHitboxManager hitboxes,
             @NotNull org.bukkit.NamespacedKey shipIdKey,
             double maxSpeed,
+            boolean collisionEnabled,
+            double collisionMargin,
+            double hitboxWidth,
+            double hitboxHeight,
             double acceleration,
             double friction,
             double riseVelocity,
@@ -92,6 +97,9 @@ public final class ShipMovementService implements Runnable {
         this.acceleration = acceleration;
         this.friction = friction;
         this.waterPhysics = new WaterPhysics(riseVelocity, sinkVelocity);
+        this.collision = collisionEnabled
+                ? new CollisionBox(hitboxWidth, hitboxHeight, collisionMargin)
+                : null;
     }
 
     public synchronized void start() {
@@ -239,10 +247,41 @@ public final class ShipMovementService implements Runnable {
         double dx = -Math.sin(yawRad) * forwardSpeed;
         double dz = Math.cos(yawRad) * forwardSpeed;
 
+        if (collision != null && (dx != 0.0 || dz != 0.0)) {
+            double[] clamped = collision.clampMovement(
+                    loc.getX(), loc.getZ(), dx, dz,
+                    (x, z) -> collidesAt(shipEntity, loc.getY(), x, z));
+            dx = clamped[0];
+            dz = clamped[1];
+        }
+
         Block feet = loc.getBlock();
         Block above = loc.clone().add(0.0, 1.0, 0.0).getBlock();
         double dy = waterPhysics.verticalVelocity(feet.isLiquid(), above.isLiquid());
 
         shipEntity.setVelocity(new Vector(dx, dy, dz));
+    }
+
+    /**
+     * Terrain collision test for the ship's hull-sized AABB centered at
+     * (x, z), base at y. Water and passable blocks (grass, flowers...) do
+     * not collide.
+     */
+    private boolean collidesAt(@NotNull Entity shipEntity, double y, double x, double z) {
+        var world = shipEntity.getWorld();
+        int[] xs = collision.blockRangeX(x, 0.0);
+        int[] ys = collision.blockRangeY(y);
+        int[] zs = collision.blockRangeZ(z, 0.0);
+        for (int bx = xs[0]; bx <= xs[1]; bx++) {
+            for (int by = ys[0]; by <= ys[1]; by++) {
+                for (int bz = zs[0]; bz <= zs[1]; bz++) {
+                    org.bukkit.block.Block block = world.getBlockAt(bx, by, bz);
+                    if (!block.isLiquid() && !block.isPassable()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

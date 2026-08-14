@@ -76,3 +76,10 @@ physics:
   riseVelocity: 0.35
   # sinkVelocity: downward speed while out of water (falls like a hull should)
   sinkVelocity: 0.30
+
+collision:
+  # Terrain collision for the ship hull (checked against the hitbox size).
+  enabled: true
+  # The collision box is the hitbox shrunk by this margin on each side, so a
+  # ship fits into an appropriately sized dock without pixel-perfect placement.
+  margin: 0.15

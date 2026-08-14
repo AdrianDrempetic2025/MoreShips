@@ -11,7 +11,7 @@ import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.CargoInventoryListener;
 import com.glooshy.ships.listener.HullApplicationListener;
 import com.glooshy.ships.listener.ModuleEntityListener;
-import com.glooshy.ships.listener.ModuleInstallListener;
+import com.glooshy.ships.listener.ShipConfigUiListener;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
 import com.glooshy.ships.listener.ShipEntityBreakListener;
 import com.glooshy.ships.listener.ShipPilotListener;
@@ -116,9 +116,9 @@ public final class MoreShips extends JavaPlugin {
                 shipRegistry, resolver, hullValidator);
         getServer().getPluginManager().registerEvents(hullListener, this);
 
-        ModuleInstallListener moduleListener = new ModuleInstallListener(
-                shipRegistry, resolver, moduleItem, moduleEntities);
-        getServer().getPluginManager().registerEvents(moduleListener, this);
+        getServer().getPluginManager().registerEvents(
+                new ShipConfigUiListener(shipRegistry, resolver, moduleItem, moduleEntities,
+                        cargoService), this);
 
         getServer().getPluginManager().registerEvents(
                 new ModuleEntityListener(moduleEntities, shipRegistry, cargoService, moduleItem), this);
@@ -137,6 +137,10 @@ public final class MoreShips extends JavaPlugin {
                     hitboxes,
                     shipIdKey,
                     config.movementMaxSpeed(),
+                    config.collisionEnabled(),
+                    config.collisionMargin(),
+                    config.shipHitboxWidth(),
+                    config.shipHitboxHeight(),
                     config.movementAcceleration(),
                     config.movementFriction(),
                     config.physicsRiseVelocity(),
@@ -160,7 +164,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-12). Physical ships: hitbox + gravity + floating.");
+        getLogger().info("MoreShips enabled (BUILD-14). Collision + ship configuration UI loaded.");
     }
 
     @Override

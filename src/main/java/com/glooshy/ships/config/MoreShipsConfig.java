@@ -103,6 +103,14 @@ public final class MoreShipsConfig {
         return -Math.abs(config.getDouble("physics.sinkVelocity", 0.30));
     }
 
+    public boolean collisionEnabled() {
+        return config.getBoolean("collision.enabled", true);
+    }
+
+    public double collisionMargin() {
+        return config.getDouble("collision.margin", 0.15);
+    }
+
     private static final Map<ModuleType, Material> DEFAULT_MODULE_MATERIALS = Map.of(
             ModuleType.SEAT, Material.OAK_STAIRS,
             ModuleType.CARGO, Material.CHEST,
