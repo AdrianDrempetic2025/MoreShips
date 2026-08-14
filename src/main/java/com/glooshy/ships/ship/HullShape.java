@@ -44,18 +44,29 @@ public final class HullShape {
     public record Cell(double localX, double localZ) {
     }
 
-    /** Local positions of the w×l 1×1 solidity cells covering the hull. */
+    /**
+     * Local positions of the 1×1 solidity cells covering the hull. Cells within
+     * {@link #DECK_CENTER_CLEARENCE} of the center are skipped: the controller
+     * stand and the pilot sit there, and a solid cell would block the ship's
+     * own movement (bug: "the ship isn't able to move").
+     */
     public static List<Cell> solidCells(ShipSize size) {
         List<Cell> cells = new ArrayList<>(size.width() * size.length());
         for (int col = 0; col < size.width(); col++) {
             for (int row = 0; row < size.length(); row++) {
-                cells.add(new Cell(
-                        col - (size.width() - 1) / 2.0,
-                        (size.length() - 1) / 2.0 - row));
+                double x = col - (size.width() - 1) / 2.0;
+                double z = (size.length() - 1) / 2.0 - row;
+                if (Math.hypot(x, z) < DECK_CENTER_CLEARENCE) {
+                    continue;
+                }
+                cells.add(new Cell(x, z));
             }
         }
         return cells;
     }
+
+    /** Radius around the ship center kept free of solidity cells. */
+    public static final double DECK_CENTER_CLEARENCE = 1.1;
 
     /**
      * The union of interaction segments must cover the hull footprint within

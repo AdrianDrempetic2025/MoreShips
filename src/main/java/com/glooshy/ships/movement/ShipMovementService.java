@@ -149,6 +149,9 @@ public final class ShipMovementService implements Runnable {
             if (!entity.hasGravity()) {
                 entity.setGravity(true); // heal pre-physics ships
             }
+            if (entity instanceof org.bukkit.entity.LivingEntity living && living.isCollidable()) {
+                living.setCollidable(false); // the solid deck must not push the controller
+            }
 
             if (ship.phase() == LifecyclePhase.FINALIZED) {
                 ShipMovement movement = movements.computeIfAbsent(
@@ -239,6 +242,7 @@ public final class ShipMovementService implements Runnable {
         org.bukkit.entity.ArmorStand stand = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, as -> {
             as.setVisible(true);
             as.setGravity(true);
+            as.setCollidable(false);
             as.setGlowing(true);
             as.setCustomNameVisible(true);
             as.customName(net.kyori.adventure.text.Component.text(

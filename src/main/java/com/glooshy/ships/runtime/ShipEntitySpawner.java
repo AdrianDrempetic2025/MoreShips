@@ -37,6 +37,7 @@ public final class ShipEntitySpawner {
         ArmorStand stand = location.getWorld().spawn(location, ArmorStand.class, as -> {
             as.setVisible(true);
             as.setGravity(true);
+            as.setCollidable(false); // the solid deck must not push the controller
             as.setGlowing(true);
             as.customName(Component.text(
                     ENTITY_LABEL + " " + shortId(shipId), NamedTextColor.AQUA));

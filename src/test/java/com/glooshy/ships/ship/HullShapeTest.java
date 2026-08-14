@@ -37,11 +37,13 @@ class HullShapeTest {
     }
 
     @Test
-    void solid_grid_tiles_the_hull_exactly() {
+    void solid_grid_tiles_the_hull_except_center_clearance() {
         for (ShipSize size : ShipSize.values()) {
-            assertEquals(size.width() * size.length(),
-                    HullShape.solidCells(size).size(),
-                    size + ": one cell per hull block");
+            long expected = size.width() * size.length() - HullShape.solidCells(size).size();
+            assertTrue(expected >= 0);
+            assertEquals(expected,
+                    countWithinClearance(size),
+                    size + ": only center cells may be skipped");
             double minX = HullShape.solidCells(size).stream()
                     .mapToDouble(HullShape.Cell::localX).min().orElseThrow();
             double maxX = HullShape.solidCells(size).stream()
@@ -52,6 +54,32 @@ class HullShapeTest {
                     .mapToDouble(HullShape.Cell::localZ).max().orElseThrow();
             assertEquals(size.width() - 1.0, maxX - minX, 1e-9, size + " width span");
             assertEquals(size.length() - 1.0, maxZ - minZ, 1e-9, size + " length span");
+        }
+    }
+
+    private long countWithinClearance(ShipSize size) {
+        // recompute skipped cells the same way solidCells does
+        int count = 0;
+        for (int col = 0; col < size.width(); col++) {
+            for (int row = 0; row < size.length(); row++) {
+                double x = col - (size.width() - 1) / 2.0;
+                double z = (size.length() - 1) / 2.0 - row;
+                if (Math.hypot(x, z) < HullShape.DECK_CENTER_CLEARENCE) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    @Test
+    void center_clearance_keeps_controller_free() {
+        for (ShipSize size : ShipSize.values()) {
+            for (HullShape.Cell cell : HullShape.solidCells(size)) {
+                assertTrue(Math.hypot(cell.localX(), cell.localZ())
+                                >= HullShape.DECK_CENTER_CLEARENCE,
+                        size + ": no cell may sit in the center clearance");
+            }
         }
     }
 
