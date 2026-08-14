@@ -342,6 +342,18 @@ public final class ShipMovementService implements Runnable {
         Block above = loc.clone().add(0.0, 1.0, 0.0).getBlock();
         double dy = waterPhysics.verticalVelocity(feet.isLiquid(), above.isLiquid());
 
+        // Ground clamp (beaching): the vertical velocity used to teleport the
+        // ship STRAIGHT THROUGH solid ground — falling from an elevated pool
+        // onto land sank the ship into the floor forever, because nothing ever
+        // stopped dy. If the hull footprint at the TARGET depth is solid, the
+        // ship rests on the surface instead (dy = 0).
+        if (dy < 0.0 && collision != null) {
+            double targetY = loc.getY() + dy;
+            if (footprintHasSolidAt(shipEntity, collision, targetY)) {
+                dy = 0.0;
+            }
+        }
+
         // Teleport-based movement: entity collision (players, the ship's own
         // solid deck, module entities) can never block the hull — terrain and
         // other ships are checked explicitly above. Passengers stay mounted
@@ -349,6 +361,31 @@ public final class ShipMovementService implements Runnable {
         Location target = loc.clone().add(dx, dy, dz);
         shipEntity.teleport(target, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN,
                 io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
+    }
+
+    /**
+     * True if any block under the hull footprint (at the ship's X/Z, rows
+     * covering the collision box) is solid at the given Y level. Water and
+     * passable blocks (grass, snow) do not count — a ship beaches on stone,
+     * not on a seagrass meadow.
+     */
+    private boolean footprintHasSolidAt(@NotNull Entity shipEntity,
+                                        @NotNull CollisionBox collision, double y) {
+        Location loc = shipEntity.getLocation();
+        int[] xs = collision.blockRangeX(loc.getX(), 0.0);
+        int[] zs = collision.blockRangeZ(loc.getZ(), 0.0);
+        int[] ys = collision.blockRangeY(y);
+        for (int bx = xs[0]; bx <= xs[1]; bx++) {
+            for (int by = ys[0]; by <= ys[1]; by++) {
+                for (int bz = zs[0]; bz <= zs[1]; bz++) {
+                    Block block = shipEntity.getWorld().getBlockAt(bx, by, bz);
+                    if (!block.isLiquid() && !block.isPassable()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
