@@ -9,7 +9,8 @@ import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.ship.LifecyclePhase;
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
+import com.glooshy.ships.ship.ShipSize;
 import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
@@ -108,7 +109,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         }
         if (args[0].equalsIgnoreCase("give") && args.length == 2) {
             String prefix = args[1].toLowerCase();
-            List<String> matches = new ArrayList<>(List.of("core"));
+            List<String> matches = new ArrayList<>(List.of("small", "medium", "large"));
             for (ModuleType type : ModuleType.values()) {
                 matches.add(type.name().toLowerCase());
             }
@@ -128,14 +129,15 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             }
             if ((args[1].equalsIgnoreCase("remove") && args.length == 3)
                     || (args[1].equalsIgnoreCase("move") && (args.length == 3 || args.length == 4))) {
-                String prefix = args[args.length - 1].toLowerCase();
-                List<String> matches = new ArrayList<>();
-                for (ModuleSlot slot : ModuleSlot.values()) {
-                    if (slot.name().toLowerCase().startsWith(prefix)) {
-                        matches.add(slot.name().toLowerCase());
-                    }
-                }
-                return matches;
+                // Admin codes: r<row>c<col> for the looked-at ship's size
+                Entity target = sender instanceof Player p ? p.getTargetEntity(TARGET_RAYTRACE_DISTANCE) : null;
+                return resolver.shipIdOf(target == null ? null : target)
+                        .flatMap(shipRegistry::find)
+                        .map(sh -> sh.size().positions().stream()
+                                .map(ModulePos::encoded)
+                                .filter(code -> code.startsWith(args[args.length - 1].toLowerCase()))
+                                .toList())
+                        .orElse(List.of());
             }
         }
         return List.of();
@@ -147,13 +149,25 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length >= 2 && !args[1].equalsIgnoreCase("core")) {
+            // Module?
             ModuleType type;
             try {
                 type = ModuleType.valueOf(args[1].toUpperCase());
-            } catch (IllegalArgumentException e) {
-                sender.sendMessage(Component.text(
-                        "Unknown module type: " + args[1]
-                                + " (seat, cargo, cannon, or core)", NamedTextColor.RED));
+            } catch (IllegalArgumentException moduleEx) {
+                // Core size?
+                ShipSize size;
+                try {
+                    size = ShipSize.valueOf(args[1].toUpperCase());
+                } catch (IllegalArgumentException sizeEx) {
+                    sender.sendMessage(Component.text(
+                            "Unknown type: " + args[1]
+                                    + " (small, medium, large, seat, cargo, cannon)",
+                            NamedTextColor.RED));
+                    return;
+                }
+                player.getInventory().addItem(shipCoreItem.create(size));
+                player.sendMessage(Component.text(
+                        "Given a " + shipCoreItem.displayName(size) + ".", NamedTextColor.GREEN));
                 return;
             }
             player.getInventory().addItem(moduleItem.create(type));
@@ -161,9 +175,9 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                     "Given a " + moduleItem.displayName(type) + ".", NamedTextColor.GREEN));
             return;
         }
-        ItemStack core = shipCoreItem.create();
+        ItemStack core = shipCoreItem.create(ShipSize.SMALL);
         player.getInventory().addItem(core);
-        player.sendMessage(Component.text("Given a Ship Core.", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("Given a Small Ship Core.", NamedTextColor.GREEN));
     }
 
     private void handleModule(CommandSender sender, @NotNull String[] args) {
@@ -201,33 +215,36 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage(Component.text(
                         "Modules on ship " + shortId(ship.identity()) + ":",
                         NamedTextColor.AQUA));
+                player.sendMessage(Component.text(
+                        "  Size: " + ship.size() + " (" + ship.size().capacity() + " slots)",
+                        NamedTextColor.GRAY));
                 if (ship.modules().isEmpty()) {
                     player.sendMessage(Component.text(
-                            "  (none — right-click the ship with a module item to install)",
+                            "  (none — right-click the ship to open the configuration UI)",
                             NamedTextColor.GRAY));
                 }
-                for (ModuleSlot slot : ModuleSlot.values()) {
-                    ModuleType type = ship.modules().get(slot);
+                for (ModulePos pos : ship.size().positions()) {
+                    ModuleType type = ship.modules().get(pos);
                     String text = type == null
-                            ? "  " + slot.name().toLowerCase() + ": —"
-                            : "  " + slot.name().toLowerCase() + ": " + moduleItem.displayName(type);
+                            ? "  " + pos.encoded() + ": —"
+                            : "  " + pos.encoded() + ": " + moduleItem.displayName(type);
                     player.sendMessage(Component.text(text,
                             type == null ? NamedTextColor.GRAY : NamedTextColor.GREEN));
                 }
             }
             case "remove" -> {
-                ModuleSlot slot = parseSlot(sender, args, 2);
-                if (slot == null) {
+                ModulePos pos = parsePos(sender, args, 2);
+                if (pos == null) {
                     return;
                 }
-                ModuleType removed = ship.modules().get(slot);
+                ModuleType removed = ship.modules().get(pos);
                 if (removed == null) {
                     player.sendMessage(Component.text(
-                            "Slot " + slot.name().toLowerCase() + " is empty.", NamedTextColor.RED));
+                            "Position " + pos.encoded() + " is empty.", NamedTextColor.RED));
                     return;
                 }
                 // RQCA-22: a removed cargo module drops its hold contents
-                Map<Integer, Map<String, Object>> hold = ship.cargo().get(slot);
+                Map<Integer, Map<String, Object>> hold = ship.cargo().get(pos);
                 Optional<ArmorStand> standOpt = resolver.shipStandOf(target);
                 if (hold != null) {
                     standOpt.ifPresent(stand -> hold.values().forEach(itemMap -> {
@@ -238,28 +255,28 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                     }));
                 }
                 Optional<ArmorStand> dropAt = resolver.shipStandOf(target);
-                shipRegistry.removeModule(shipId, slot);
-                moduleEntities.despawn(shipId, slot);
+                shipRegistry.removeModule(shipId, pos);
+                moduleEntities.despawn(shipId, pos);
                 dropAt.ifPresent(stand -> stand.getWorld().dropItemNaturally(
                         stand.getLocation(), moduleItem.create(removed)));
                 player.sendMessage(Component.text(
-                        "Removed " + moduleItem.displayName(removed) + " from slot "
-                                + slot.name().toLowerCase() + " and dropped it.",
+                        "Removed " + moduleItem.displayName(removed) + " from "
+                                + pos.encoded() + " and dropped it.",
                         NamedTextColor.GREEN));
             }
             case "move" -> {
-                ModuleSlot from = parseSlot(sender, args, 2);
+                ModulePos from = parsePos(sender, args, 2);
                 if (from == null) {
                     return;
                 }
-                ModuleSlot to = parseSlot(sender, args, 3);
+                ModulePos to = parsePos(sender, args, 3);
                 if (to == null) {
                     return;
                 }
                 ModuleType moved = ship.modules().get(from);
                 if (moved == null) {
                     player.sendMessage(Component.text(
-                            "Source slot " + from.name().toLowerCase() + " is empty.",
+                            "Source position " + from.encoded() + " is empty.",
                             NamedTextColor.RED));
                     return;
                 }
@@ -274,7 +291,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                 moduleEntities.spawn(updatedShip, to);
                 player.sendMessage(Component.text(
                         "Moved " + moduleItem.displayName(moved) + ": "
-                                + from.name().toLowerCase() + " → " + to.name().toLowerCase(),
+                                + from.encoded() + " → " + to.encoded(),
                         NamedTextColor.GREEN));
             }
             default -> player.sendMessage(Component.text(
@@ -282,21 +299,20 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    private static @Nullable ModuleSlot parseSlot(CommandSender sender, String[] args, int index) {
+    private static @Nullable ModulePos parsePos(CommandSender sender, String[] args, int index) {
         if (args.length <= index) {
             sender.sendMessage(Component.text(
-                    "Usage: /moreships module remove|move <BOW|STERN|PORT|STARBOARD>",
+                    "Usage: /moreships module remove|move <r<row>c<col>>",
                     NamedTextColor.RED));
             return null;
         }
-        try {
-            return ModuleSlot.valueOf(args[index].toUpperCase());
-        } catch (IllegalArgumentException e) {
+        ModulePos pos = ModulePos.decode(args[index].toLowerCase());
+        if (pos == null) {
             sender.sendMessage(Component.text(
-                    "Unknown slot: " + args[index]
-                            + " (BOW, STERN, PORT, STARBOARD)", NamedTextColor.RED));
-            return null;
+                    "Unknown position: " + args[index] + " (format: r2c0)",
+                    NamedTextColor.RED));
         }
+        return pos;
     }
 
     private void handleInfo(CommandSender sender) {
@@ -375,8 +391,10 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
 
         if (sender instanceof Player player) {
             ItemStack inMainHand = player.getInventory().getItemInMainHand();
+            var coreSize = shipCoreItem.parseSize(inMainHand);
             sender.sendMessage(Component.text("Main hand: ", NamedTextColor.AQUA)
-                    .append(Component.text(shipCoreItem.diagnose(inMainHand), NamedTextColor.YELLOW)));
+                    .append(Component.text(coreSize == null ? "not a ship core"
+                            : coreSize.name() + " core", NamedTextColor.YELLOW)));
         }
 
         sender.sendMessage(Component.text(
@@ -418,7 +436,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         }
         // Admin convenience: opens the first cargo module's hold;
         // right-clicking a specific cargo module opens that one.
-        ModuleSlot firstCargo = ship.modules().entrySet().stream()
+        ModulePos firstCargo = ship.modules().entrySet().stream()
                 .filter(e -> e.getValue() == ModuleType.CARGO)
                 .map(Map.Entry::getKey)
                 .findFirst()

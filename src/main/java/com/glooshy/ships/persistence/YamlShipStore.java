@@ -2,8 +2,9 @@ package com.glooshy.ships.persistence;
 
 import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.ship.LifecyclePhase;
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.ModuleType;
+import com.glooshy.ships.ship.ShipSize;
 import com.glooshy.ships.ship.Ship;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -73,6 +74,7 @@ public final class YamlShipStore implements ShipStore {
         for (Ship ship : ships) {
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("identity", ship.identity().encoded());
+            entry.put("size", ship.size().name());
             entry.put("phase", ship.phase().name());
             if (ship.hullMaterial() != null) {
                 entry.put("hullMaterial", ship.hullMaterial().name());
@@ -83,12 +85,12 @@ public final class YamlShipStore implements ShipStore {
             }
             if (!ship.modules().isEmpty()) {
                 Map<String, String> modules = new LinkedHashMap<>();
-                ship.modules().forEach((slot, type) -> modules.put(slot.name(), type.name()));
+                ship.modules().forEach((pos, type) -> modules.put(pos.encoded(), type.name()));
                 entry.put("modules", modules);
             }
             if (!ship.cargo().isEmpty()) {
                 Map<String, List<Map<String, Object>>> cargo = new LinkedHashMap<>();
-                ship.cargo().forEach((moduleSlot, hold) -> {
+                ship.cargo().forEach((pos, hold) -> {
                     List<Map<String, Object>> rows = new ArrayList<>(hold.size());
                     hold.forEach((index, item) -> {
                         Map<String, Object> row = new LinkedHashMap<>();
@@ -96,7 +98,7 @@ public final class YamlShipStore implements ShipStore {
                         row.put("item", item);
                         rows.add(row);
                     });
-                    cargo.put(moduleSlot.name(), rows);
+                    cargo.put(pos.encoded(), rows);
                 });
                 entry.put("cargo", cargo);
             }
@@ -121,6 +123,13 @@ public final class YamlShipStore implements ShipStore {
         } catch (IllegalArgumentException e) {
             return null;
         }
+        Object sizeRaw = map.get("size");
+        ShipSize size;
+        try {
+            size = sizeRaw instanceof String sizeName ? ShipSize.valueOf(sizeName) : ShipSize.SMALL;
+        } catch (IllegalArgumentException e) {
+            size = ShipSize.SMALL;
+        }
         Object phaseRaw = map.get("phase");
         if (!(phaseRaw instanceof String phaseStr)) {
             return null;
@@ -137,31 +146,33 @@ public final class YamlShipStore implements ShipStore {
         int currentHp = map.get("currentHp") instanceof Number n ? n.intValue() : -1;
         int maxHp = map.get("maxHp") instanceof Number n2 ? n2.intValue() : -1;
 
-        Map<ModuleSlot, ModuleType> modules = new LinkedHashMap<>();
+        Map<ModulePos, ModuleType> modules = new LinkedHashMap<>();
         Object modulesRaw = map.get("modules");
         Map<String, Object> modulesMap = modulesRaw instanceof MemorySection section
                 ? section.getValues(false)
                 : (modulesRaw instanceof Map<?, ?> raw ? asStringMap(raw) : null);
         if (modulesMap != null) {
             for (Map.Entry<String, Object> e : modulesMap.entrySet()) {
+                ModulePos pos = ModulePos.decode(e.getKey());
+                if (pos == null || !size.isValid(pos)) {
+                    continue; // Old-format named slot or invalid position — dropped
+                }
                 try {
-                    modules.put(ModuleSlot.valueOf(e.getKey()), ModuleType.valueOf(String.valueOf(e.getValue())));
+                    modules.put(pos, ModuleType.valueOf(String.valueOf(e.getValue())));
                 } catch (IllegalArgumentException ignored) {
-                    // Unknown slot/type from a newer version — skip this entry
+                    // Unknown type from a newer version — skip this entry
                 }
             }
         }
-        Map<ModuleSlot, Map<Integer, Map<String, Object>>> cargo = new LinkedHashMap<>();
+        Map<ModulePos, Map<Integer, Map<String, Object>>> cargo = new LinkedHashMap<>();
         Object cargoRaw = map.get("cargo");
         Map<String, Object> holdsBySlot = cargoRaw instanceof MemorySection section
                 ? section.getValues(false)
                 : (cargoRaw instanceof Map<?, ?> raw ? asStringMap(raw) : null);
         if (holdsBySlot != null) {
             for (Map.Entry<String, Object> holdEntry : holdsBySlot.entrySet()) {
-                ModuleSlot moduleSlot;
-                try {
-                    moduleSlot = ModuleSlot.valueOf(holdEntry.getKey());
-                } catch (IllegalArgumentException e) {
+                ModulePos modulePos = ModulePos.decode(holdEntry.getKey());
+                if (modulePos == null || !size.isValid(modulePos)) {
                     continue;
                 }
                 if (!(holdEntry.getValue() instanceof List<?> rows)) {
@@ -181,11 +192,11 @@ public final class YamlShipStore implements ShipStore {
                     }
                     hold.put(index.intValue(), asStringMap((Map<?, ?>) rowMap.get("item")));
                 }
-                cargo.put(moduleSlot, hold);
+                cargo.put(modulePos, hold);
             }
         }
 
-        return new Ship(identity, phase, hull, currentHp, maxHp,
+        return new Ship(identity, size, phase, hull, currentHp, maxHp,
                 Map.copyOf(modules), Map.copyOf(cargo));
     }
 

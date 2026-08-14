@@ -27,7 +27,7 @@ class ShipRegistryLifecycleTest {
     void createShip_starts_in_unfinished_phase() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
 
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         assertEquals(LifecyclePhase.UNFINISHED, ship.phase(),
                 "New ships must start UNFINISHED (DEFECT-06)");
@@ -36,7 +36,7 @@ class ShipRegistryLifecycleTest {
     @Test
     void transition_applies_valid_phase_change() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         Ship transitioned = registry.transition(ship.identity(), LifecyclePhase.HULL_APPLIED);
 
@@ -47,7 +47,7 @@ class ShipRegistryLifecycleTest {
     @Test
     void transition_throws_on_invalid_path() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         // UNFINISHED → FINALIZED is invalid (must go through HULL_APPLIED)
         IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -68,7 +68,7 @@ class ShipRegistryLifecycleTest {
     @Test
     void transition_is_atomic_under_concurrent_attempts() throws Exception {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         int threads = 8;
         Thread[] pool = new Thread[threads];

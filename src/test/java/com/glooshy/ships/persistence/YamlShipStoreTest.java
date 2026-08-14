@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.ship.LifecyclePhase;
+import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.Ship;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,14 +44,8 @@ class YamlShipStoreTest {
         Path file = tempDir.resolve("ships.yml");
         YamlShipStore store = new YamlShipStore(file);
 
-        Ship ship1 = new Ship(
-                ShipIdentity.fromUuid(UUID.randomUUID()),
-                LifecyclePhase.UNFINISHED,
-                null);
-        Ship ship2 = new Ship(
-                ShipIdentity.fromUuid(UUID.randomUUID()),
-                LifecyclePhase.HULL_APPLIED,
-                null);
+        Ship ship1 = new Ship(ShipIdentity.fromUuid(UUID.randomUUID()), com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.UNFINISHED, null);
+        Ship ship2 = new Ship(ShipIdentity.fromUuid(UUID.randomUUID()), com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.HULL_APPLIED, null);
 
         store.save(List.of(ship1, ship2));
 
@@ -104,9 +99,7 @@ class YamlShipStoreTest {
         Path file = tempDir.resolve("atomic.yml");
         YamlShipStore store = new YamlShipStore(file);
 
-        store.save(List.of(new Ship(
-                ShipIdentity.fromUuid(UUID.randomUUID()),
-                LifecyclePhase.UNFINISHED, null)));
+        store.save(List.of(new Ship(ShipIdentity.fromUuid(UUID.randomUUID()), com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.UNFINISHED, null)));
 
         assertTrue(Files.exists(file), "Target file must exist after atomic save");
         Path temp = file.resolveSibling(file.getFileName() + ".tmp");
@@ -119,7 +112,7 @@ class YamlShipStoreTest {
         Path file = tempDir.resolve("overwrite.yml");
         YamlShipStore store = new YamlShipStore(file);
 
-        Ship first = new Ship(ShipIdentity.fromUuid(UUID.randomUUID()), LifecyclePhase.UNFINISHED, null);
+        Ship first = new Ship(ShipIdentity.fromUuid(UUID.randomUUID()), com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.UNFINISHED, null);
         store.save(List.of(first));
         assertEquals(1, store.load().size());
 
@@ -137,6 +130,7 @@ class YamlShipStoreTest {
         for (int i = 0; i < 100; i++) {
             many.add(new Ship(
                     ShipIdentity.fromUuid(UUID.randomUUID()),
+                    com.glooshy.ships.ship.ShipSize.SMALL,
                     i % 2 == 0 ? LifecyclePhase.UNFINISHED : LifecyclePhase.HULL_APPLIED,
                     null));
         }
@@ -160,13 +154,15 @@ class YamlShipStoreTest {
 
         Ship ship = new Ship(
                 ShipIdentity.fromUuid(UUID.randomUUID()),
+                com.glooshy.ships.ship.ShipSize.MEDIUM,
                 LifecyclePhase.HULL_APPLIED,
                 null,
                 -1,
                 -1,
                 java.util.Map.of(
-                        com.glooshy.ships.ship.ModuleSlot.BOW, com.glooshy.ships.ship.ModuleType.CANNON,
-                        com.glooshy.ships.ship.ModuleSlot.STARBOARD, com.glooshy.ships.ship.ModuleType.SEAT));
+                        new ModulePos(1, 0), com.glooshy.ships.ship.ModuleType.CANNON,
+                        new ModulePos(2, 0), com.glooshy.ships.ship.ModuleType.SEAT),
+                Map.of());
 
         store.save(List.of(ship));
 
@@ -177,9 +173,9 @@ class YamlShipStoreTest {
         assertEquals(2, restored.modules().size(),
                 "Fitted modules must survive the save/load round-trip");
         assertEquals(com.glooshy.ships.ship.ModuleType.CANNON,
-                restored.modules().get(com.glooshy.ships.ship.ModuleSlot.BOW));
+                restored.modules().get(new ModulePos(1, 0)));
         assertEquals(com.glooshy.ships.ship.ModuleType.SEAT,
-                restored.modules().get(com.glooshy.ships.ship.ModuleSlot.STARBOARD));
+                restored.modules().get(new ModulePos(2, 0)));
     }
 
     /** Unknown slot/type names in the file are skipped, not fatal. */
@@ -189,11 +185,12 @@ class YamlShipStoreTest {
         Files.writeString(file, """
                 ships:
                   - identity: "%s"
+                    size: MEDIUM
                     phase: HULL_APPLIED
                     modules:
-                      BOW: CARGO
-                      NONEXISTENT_SLOT: CARGO
-                      STERN: NONEXISTENT_TYPE
+                      r0c1: CARGO
+                      r9c9: CARGO
+                      garbage: NONEXISTENT_TYPE
                 """.formatted(UUID.randomUUID()));
 
         List<Ship> loaded = new YamlShipStore(file).load();
@@ -202,7 +199,7 @@ class YamlShipStoreTest {
         assertEquals(1, loaded.get(0).modules().size(),
                 "Only the valid module entry survives");
         assertEquals(com.glooshy.ships.ship.ModuleType.CARGO,
-                loaded.get(0).modules().get(com.glooshy.ships.ship.ModuleSlot.BOW));
+                loaded.get(0).modules().get(new ModulePos(1, 0)));
     }
 
     /**
@@ -221,18 +218,18 @@ class YamlShipStoreTest {
                 26, Map.of("type", "DIAMOND", "amount", 1));
         Map<Integer, Map<String, Object>> sternHold = Map.of(
                 5, Map.of("type", "GOLD_INGOT"));
-        Map<com.glooshy.ships.ship.ModuleSlot, Map<Integer, Map<String, Object>>> cargo = Map.of(
-                com.glooshy.ships.ship.ModuleSlot.BOW, bowHold,
-                com.glooshy.ships.ship.ModuleSlot.STERN, sternHold);
+        Map<ModulePos, Map<Integer, Map<String, Object>>> cargo = Map.of(
+                new ModulePos(1, 0), bowHold,
+                new ModulePos(1, 3), sternHold);
         Ship ship = new Ship(
                 ShipIdentity.fromUuid(UUID.randomUUID()),
-                LifecyclePhase.FINALIZED,
+                com.glooshy.ships.ship.ShipSize.MEDIUM, LifecyclePhase.FINALIZED,
                 null,
                 18,
                 20,
                 java.util.Map.of(
-                        com.glooshy.ships.ship.ModuleSlot.BOW, com.glooshy.ships.ship.ModuleType.CARGO,
-                        com.glooshy.ships.ship.ModuleSlot.STERN, com.glooshy.ships.ship.ModuleType.CARGO),
+                        new ModulePos(1, 0), com.glooshy.ships.ship.ModuleType.CARGO,
+                        new ModulePos(1, 3), com.glooshy.ships.ship.ModuleType.CARGO),
                 cargo);
 
         store.save(List.of(ship));
@@ -241,9 +238,9 @@ class YamlShipStoreTest {
 
         assertEquals(1, loaded.size());
         Ship restored = loaded.get(0);
-        assertEquals(bowHold, restored.cargo().get(com.glooshy.ships.ship.ModuleSlot.BOW),
+        assertEquals(bowHold, restored.cargo().get(new ModulePos(1, 0)),
                 "BOW hold must survive the round-trip");
-        assertEquals(sternHold, restored.cargo().get(com.glooshy.ships.ship.ModuleSlot.STERN),
+        assertEquals(sternHold, restored.cargo().get(new ModulePos(1, 3)),
                 "STERN hold must survive the round-trip independently");
     }
 
@@ -260,7 +257,7 @@ class YamlShipStoreTest {
 
         Ship ship = new Ship(
                 ShipIdentity.fromUuid(UUID.randomUUID()),
-                LifecyclePhase.FINALIZED,
+                com.glooshy.ships.ship.ShipSize.MEDIUM, LifecyclePhase.FINALIZED,
                 null,
                 7,
                 20);

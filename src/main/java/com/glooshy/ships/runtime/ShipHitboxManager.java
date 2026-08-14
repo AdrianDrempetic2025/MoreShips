@@ -1,6 +1,7 @@
 package com.glooshy.ships.runtime;
 
 import com.glooshy.ships.identity.ShipIdentity;
+import com.glooshy.ships.ship.ShipRegistry;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,7 +32,8 @@ public final class ShipHitboxManager {
 
     private final NamespacedKey shipIdKey;
     private final RuntimeBindingRegistry bindingRegistry;
-    private final double width;
+    private final ShipRegistry shipRegistry;
+    private final double defaultWidth;
     private final double height;
 
     private final Map<ShipIdentity, UUID> byShip = new ConcurrentHashMap<>();
@@ -39,12 +41,20 @@ public final class ShipHitboxManager {
 
     public ShipHitboxManager(NamespacedKey shipIdKey,
                              RuntimeBindingRegistry bindingRegistry,
-                             double width,
+                             ShipRegistry shipRegistry,
+                             double defaultWidth,
                              double height) {
         this.shipIdKey = shipIdKey;
         this.bindingRegistry = bindingRegistry;
-        this.width = width;
+        this.shipRegistry = shipRegistry;
+        this.defaultWidth = defaultWidth;
         this.height = height;
+    }
+
+    private double widthOf(ShipIdentity shipId) {
+        return shipRegistry.find(shipId)
+                .map(s -> s.size().hitboxWidth())
+                .orElse(defaultWidth);
     }
 
     /** Resolve a hitbox entity to its ship. */
@@ -75,6 +85,7 @@ public final class ShipHitboxManager {
             if (uuid != null) {
                 byEntity.remove(uuid);
             }
+            double width = widthOf(shipId);
             Interaction hitbox = target.getWorld().spawn(target, Interaction.class, ie -> {
                 ie.setInteractionWidth((float) width);
                 ie.setInteractionHeight((float) height);

@@ -5,7 +5,7 @@ import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.ship.LifecyclePhase;
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
@@ -109,12 +109,12 @@ public final class ShipConfigUiListener implements Listener {
         }
 
         int index = event.getSlot();
-        ModuleSlot slot = ConfigUiLayout.slotAt(index);
-        if (slot != null) {
-            handleModuleSlotClick(event, player, ship, holder, slot);
+        ModulePos pos = ConfigUiLayout.posAt(ship.size(), index);
+        if (pos != null) {
+            handleModuleSlotClick(event, player, ship, holder, pos);
             return;
         }
-        if (index == ConfigUiLayout.FINALIZE_INDEX) {
+        if (index == ConfigUiLayout.finalizeIndex(ship.size())) {
             handleFinalizeClick(event, player, ship, holder);
         }
         // Info + filler slots: cancelled, nothing to do
@@ -128,22 +128,22 @@ public final class ShipConfigUiListener implements Listener {
     }
 
     private void handleModuleSlotClick(InventoryClickEvent event, Player player,
-                                       Ship ship, ShipConfigUiHolder holder, ModuleSlot slot) {
+                                       Ship ship, ShipConfigUiHolder holder, ModulePos pos) {
         ItemStack cursor = event.getCursor();
         ModuleType held = cursor == null ? null : moduleItem.parse(cursor).orElse(null);
-        ModuleType fitted = ship.modules().get(slot);
+        ModuleType fitted = ship.modules().get(pos);
 
         if (held != null && fitted == null) {
             // Place: install the module from the cursor
             try {
-                Ship updated = shipRegistry.installModule(ship.identity(), held, slot);
-                moduleEntities.spawn(updated, slot);
+                Ship updated = shipRegistry.installModule(ship.identity(), held, pos);
+                moduleEntities.spawn(updated, pos);
                 event.getView().setCursor(null);
                 event.getInventory().setItem(
-                        ConfigUiLayout.SLOT_INDEX.get(slot), moduleItem.create(held));
+                        ConfigUiLayout.indexOf(ship.size(), pos), moduleItem.create(held));
                 player.sendMessage(Component.text(
-                        "Installed " + moduleItem.displayName(held) + " in "
-                                + slot.name().toLowerCase() + ".",
+                        "Installed " + moduleItem.displayName(held) + " at "
+                                + pos.encoded() + ".",
                         NamedTextColor.GREEN));
             } catch (IllegalStateException e) {
                 player.sendMessage(Component.text(e.getMessage(), NamedTextColor.RED));
@@ -153,17 +153,17 @@ public final class ShipConfigUiListener implements Listener {
 
         if (held == null && fitted != null) {
             // Pick up: remove the module onto the cursor
-            dropCargoHold(player, ship, slot);
+            dropCargoHold(player, ship, pos);
             try {
-                shipRegistry.removeModule(ship.identity(), slot);
-                moduleEntities.despawn(ship.identity(), slot);
+                shipRegistry.removeModule(ship.identity(), pos);
+                moduleEntities.despawn(ship.identity(), pos);
                 event.getView().setCursor(moduleItem.create(fitted));
                 event.getInventory().setItem(
-                        ConfigUiLayout.SLOT_INDEX.get(slot), ui.slotIcon(
-                                shipRegistry.find(ship.identity()).orElse(ship), slot));
+                        ConfigUiLayout.indexOf(ship.size(), pos), ui.slotIcon(
+                                shipRegistry.find(ship.identity()).orElse(ship), pos));
                 player.sendMessage(Component.text(
                         "Removed " + moduleItem.displayName(fitted) + " from "
-                                + slot.name().toLowerCase() + ".",
+                                + pos.encoded() + ".",
                         NamedTextColor.GREEN));
             } catch (IllegalStateException e) {
                 player.sendMessage(Component.text(e.getMessage(), NamedTextColor.RED));
@@ -173,11 +173,11 @@ public final class ShipConfigUiListener implements Listener {
 
         if (held != null && fitted != null) {
             player.sendMessage(Component.text(
-                    "Slot " + slot.name().toLowerCase() + " is occupied — remove the "
+                    "Position " + pos.encoded() + " is occupied — remove the "
                             + moduleItem.displayName(fitted) + " first.",
                     NamedTextColor.RED));
         }
-        // Empty slot, empty cursor: nothing to do
+        // Empty position, empty cursor: nothing to do
     }
 
     private void handleFinalizeClick(InventoryClickEvent event, Player player,
@@ -185,7 +185,8 @@ public final class ShipConfigUiListener implements Listener {
         long now = System.currentTimeMillis();
         if (!holder.confirmFinalize(now)) {
             holder.armFinalize(now);
-            event.getInventory().setItem(ConfigUiLayout.FINALIZE_INDEX, ui.finalizeButton(true));
+            event.getInventory().setItem(
+                    ConfigUiLayout.finalizeIndex(ship.size()), ui.finalizeButton(true));
             player.sendMessage(Component.text(
                     "Click again within 5s to finalize. This is IRREVERSIBLE.",
                     NamedTextColor.YELLOW));
@@ -203,8 +204,8 @@ public final class ShipConfigUiListener implements Listener {
     }
 
     /** RQCA-22: removing a cargo module returns its hold contents. */
-    private void dropCargoHold(Player player, Ship ship, ModuleSlot slot) {
-        Map<Integer, Map<String, Object>> hold = ship.cargo().get(slot);
+    private void dropCargoHold(Player player, Ship ship, ModulePos pos) {
+        Map<Integer, Map<String, Object>> hold = ship.cargo().get(pos);
         if (hold == null) {
             return;
         }

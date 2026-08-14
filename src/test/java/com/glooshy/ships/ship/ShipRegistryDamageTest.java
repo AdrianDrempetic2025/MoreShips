@@ -19,7 +19,7 @@ class ShipRegistryDamageTest {
     @Test
     void applyDamage_reduces_hp_on_finalized_ship() {
         ShipRegistry registry = newRegistry();
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
         registry.applyHull(ship.identity(), null); // hull applied (HP set to -1 because hardness unknown from null)
         registry.transition(ship.identity(), LifecyclePhase.FINALIZED);
 
@@ -31,7 +31,7 @@ class ShipRegistryDamageTest {
 
         // Replace with a ship that has explicit HP via the load path:
         registry.remove(ship.identity());
-        Ship explicit = new Ship(ship.identity(), LifecyclePhase.FINALIZED, null, 50, 50);
+        Ship explicit = new Ship(ship.identity(), com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.FINALIZED, null, 50, 50);
         registry.load(java.util.List.of(explicit));
 
         Ship after = registry.applyDamage(ship.identity(), 10);
@@ -44,7 +44,7 @@ class ShipRegistryDamageTest {
     void applyDamage_clamps_to_zero() {
         ShipRegistry registry = newRegistry();
         ShipIdentity id = ShipIdentityGenerator.uuid().generate();
-        Ship ship = new Ship(id, LifecyclePhase.FINALIZED, null, 5, 5);
+        Ship ship = new Ship(id, com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.FINALIZED, null, 5, 5);
         registry.load(java.util.List.of(ship));
 
         Ship after = registry.applyDamage(id, 100);
@@ -55,7 +55,7 @@ class ShipRegistryDamageTest {
     @Test
     void applyDamage_throws_for_non_finalized_ship() {
         ShipRegistry registry = newRegistry();
-        Ship ship = registry.createShip(); // UNFINISHED
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM); // UNFINISHED
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> registry.applyDamage(ship.identity(), 5));
@@ -77,7 +77,7 @@ class ShipRegistryDamageTest {
     void applyDamage_rejects_negative_amount() {
         ShipRegistry registry = newRegistry();
         ShipIdentity id = ShipIdentityGenerator.uuid().generate();
-        Ship ship = new Ship(id, LifecyclePhase.FINALIZED, null, 50, 50);
+        Ship ship = new Ship(id, com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.FINALIZED, null, 50, 50);
         registry.load(java.util.List.of(ship));
 
         assertThrows(IllegalArgumentException.class,
@@ -94,7 +94,7 @@ class ShipRegistryDamageTest {
     void applyDamage_actually_changes_hp() {
         ShipRegistry registry = newRegistry();
         ShipIdentity id = ShipIdentityGenerator.uuid().generate();
-        Ship ship = new Ship(id, LifecyclePhase.FINALIZED, null, 100, 100);
+        Ship ship = new Ship(id, com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.FINALIZED, null, 100, 100);
         registry.load(java.util.List.of(ship));
 
         Ship after = registry.applyDamage(id, 30);
@@ -108,7 +108,7 @@ class ShipRegistryDamageTest {
     void applyDamage_atomic_under_concurrency() throws Exception {
         ShipRegistry registry = newRegistry();
         ShipIdentity id = ShipIdentityGenerator.uuid().generate();
-        Ship ship = new Ship(id, LifecyclePhase.FINALIZED, null, 1000, 1000);
+        Ship ship = new Ship(id, com.glooshy.ships.ship.ShipSize.SMALL, LifecyclePhase.FINALIZED, null, 1000, 1000);
         registry.load(java.util.List.of(ship));
 
         int threads = 10;

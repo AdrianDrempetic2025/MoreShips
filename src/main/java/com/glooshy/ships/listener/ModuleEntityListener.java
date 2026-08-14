@@ -4,7 +4,7 @@ import com.glooshy.ships.cargo.CargoService;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.ship.LifecyclePhase;
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
@@ -65,19 +65,19 @@ public final class ModuleEntityListener implements Listener {
         event.setCancelled(true);
 
         Player player = event.getPlayer();
-        ModuleSlot slot = binding.get().slot();
+        ModulePos pos = binding.get().pos();
         Optional<Ship> shipOpt = shipRegistry.find(binding.get().shipId());
         if (shipOpt.isEmpty()) {
             return;
         }
         Ship ship = shipOpt.get();
-        ModuleType type = ship.modules().get(slot);
+        ModuleType type = ship.modules().get(pos);
         if (type == null) {
             return;
         }
 
         switch (type) {
-            case CARGO -> cargoService.open(player, ship, slot);
+            case CARGO -> cargoService.open(player, ship, pos);
             case SEAT -> {
                 if (!stand.getPassengers().isEmpty()) {
                     player.sendMessage(Component.text(
@@ -108,7 +108,7 @@ public final class ModuleEntityListener implements Listener {
             return; // Only a player punch removes a module
         }
 
-        ModuleSlot slot = binding.get().slot();
+        ModulePos pos = binding.get().pos();
         Optional<Ship> shipOpt = shipRegistry.find(binding.get().shipId());
         if (shipOpt.isEmpty()) {
             return;
@@ -124,12 +124,12 @@ public final class ModuleEntityListener implements Listener {
             return;
         }
 
-        ModuleType removed = ship.modules().get(slot);
+        ModuleType removed = ship.modules().get(pos);
         if (removed == null) {
             return;
         }
         // RQCA-22: a removed cargo module drops its hold contents (conservation)
-        Map<Integer, Map<String, Object>> hold = ship.cargo().get(slot);
+        Map<Integer, Map<String, Object>> hold = ship.cargo().get(pos);
         if (hold != null) {
             hold.values().forEach(itemMap -> {
                 org.bukkit.inventory.ItemStack item = cargoService.deserializeItem(itemMap);
@@ -138,13 +138,13 @@ public final class ModuleEntityListener implements Listener {
                 }
             });
         }
-        shipRegistry.removeModule(binding.get().shipId(), slot);
+        shipRegistry.removeModule(binding.get().shipId(), pos);
         stand.getWorld().dropItemNaturally(
                 stand.getLocation(), moduleItem.create(removed));
-        moduleEntities.despawn(binding.get().shipId(), slot);
+        moduleEntities.despawn(binding.get().shipId(), pos);
         player.sendMessage(Component.text(
                 "Removed " + moduleItem.displayName(removed)
-                        + " from slot " + slot.name().toLowerCase() + ".",
+                        + " from " + pos.encoded() + ".",
                 NamedTextColor.GREEN));
     }
 }

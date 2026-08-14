@@ -17,13 +17,13 @@ import org.junit.jupiter.api.Test;
 class ShipRegistryCargoTest {
 
     private Ship newHullAppliedShipWithCargoModule(ShipRegistry registry) {
-        return newHullAppliedShipWithCargoModule(registry, ModuleSlot.BOW);
+        return newHullAppliedShipWithCargoModule(registry, new ModulePos(1, 0));
     }
 
-    private Ship newHullAppliedShipWithCargoModule(ShipRegistry registry, ModuleSlot slot) {
-        Ship ship = registry.createShip();
+    private Ship newHullAppliedShipWithCargoModule(ShipRegistry registry, ModulePos pos) {
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
         registry.applyHull(ship.identity(), null);
-        registry.installModule(ship.identity(), ModuleType.CARGO, slot);
+        registry.installModule(ship.identity(), ModuleType.CARGO, pos);
         return registry.find(ship.identity()).orElseThrow();
     }
 
@@ -33,30 +33,30 @@ class ShipRegistryCargoTest {
         Ship ship = newHullAppliedShipWithCargoModule(registry);
 
         Map<String, Object> item = Map.of("type", "STONE", "amount", 3);
-        Ship updated = registry.setCargo(ship.identity(), ModuleSlot.BOW, Map.of(4, item));
+        Ship updated = registry.setCargo(ship.identity(), new ModulePos(1, 0), Map.of(4, item));
 
-        assertEquals(Map.of(4, item), updated.cargo().get(ModuleSlot.BOW));
+        assertEquals(Map.of(4, item), updated.cargo().get(new ModulePos(1, 0)));
         assertEquals(Map.of(4, item),
-                registry.find(ship.identity()).orElseThrow().cargo().get(ModuleSlot.BOW));
+                registry.find(ship.identity()).orElseThrow().cargo().get(new ModulePos(1, 0)));
     }
 
     @Test
     void two_cargo_modules_have_separate_holds() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
         registry.applyHull(ship.identity(), null);
-        registry.installModule(ship.identity(), ModuleType.CARGO, ModuleSlot.BOW);
-        registry.installModule(ship.identity(), ModuleType.CARGO, ModuleSlot.STERN);
+        registry.installModule(ship.identity(), ModuleType.CARGO, new ModulePos(1, 0));
+        registry.installModule(ship.identity(), ModuleType.CARGO, new ModulePos(1, 3));
 
         Map<String, Object> stones = Map.of("type", "STONE");
         Map<String, Object> diamonds = Map.of("type", "DIAMOND");
-        registry.setCargo(ship.identity(), ModuleSlot.BOW, Map.of(0, stones));
-        registry.setCargo(ship.identity(), ModuleSlot.STERN, Map.of(0, diamonds));
+        registry.setCargo(ship.identity(), new ModulePos(1, 0), Map.of(0, stones));
+        registry.setCargo(ship.identity(), new ModulePos(1, 3), Map.of(0, diamonds));
 
         Ship fromRegistry = registry.find(ship.identity()).orElseThrow();
-        assertEquals(Map.of(0, stones), fromRegistry.cargo().get(ModuleSlot.BOW),
+        assertEquals(Map.of(0, stones), fromRegistry.cargo().get(new ModulePos(1, 0)),
                 "BOW hold must not leak into STERN");
-        assertEquals(Map.of(0, diamonds), fromRegistry.cargo().get(ModuleSlot.STERN),
+        assertEquals(Map.of(0, diamonds), fromRegistry.cargo().get(new ModulePos(1, 3)),
                 "STERN hold must not leak into BOW");
     }
 
@@ -65,21 +65,21 @@ class ShipRegistryCargoTest {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(10.0));
         Ship ship = newHullAppliedShipWithCargoModule(registry);
 
-        registry.setCargo(ship.identity(), ModuleSlot.BOW, Map.of(0, Map.of("type", "DIRT")));
+        registry.setCargo(ship.identity(), new ModulePos(1, 0), Map.of(0, Map.of("type", "DIRT")));
         Map<Integer, Map<String, Object>> fresh = Map.of(26, Map.of("type", "DIAMOND"));
-        Ship updated = registry.setCargo(ship.identity(), ModuleSlot.BOW, fresh);
+        Ship updated = registry.setCargo(ship.identity(), new ModulePos(1, 0), fresh);
 
-        assertEquals(fresh, updated.cargo().get(ModuleSlot.BOW), "Bulk setter replaces, not merges");
+        assertEquals(fresh, updated.cargo().get(new ModulePos(1, 0)), "Bulk setter replaces, not merges");
     }
 
     @Test
     void setCargo_throws_for_unknown_ship() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
         registry.remove(ship.identity());
 
         assertThrows(IllegalStateException.class,
-                () -> registry.setCargo(ship.identity(), ModuleSlot.BOW, Map.of()));
+                () -> registry.setCargo(ship.identity(), new ModulePos(1, 0), Map.of()));
     }
 
     @Test
@@ -87,12 +87,12 @@ class ShipRegistryCargoTest {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(10.0));
         Ship ship = newHullAppliedShipWithCargoModule(registry);
         Map<Integer, Map<String, Object>> hold = Map.of(3, Map.of("type", "GOLD_INGOT"));
-        registry.setCargo(ship.identity(), ModuleSlot.BOW, hold);
+        registry.setCargo(ship.identity(), new ModulePos(1, 0), hold);
 
-        Ship moved = registry.moveModule(ship.identity(), ModuleSlot.BOW, ModuleSlot.PORT);
+        Ship moved = registry.moveModule(ship.identity(), new ModulePos(1, 0), new ModulePos(0, 0));
 
-        assertNull(moved.cargo().get(ModuleSlot.BOW), "Old slot must not keep the hold");
-        assertEquals(hold, moved.cargo().get(ModuleSlot.PORT),
+        assertNull(moved.cargo().get(new ModulePos(1, 0)), "Old slot must not keep the hold");
+        assertEquals(hold, moved.cargo().get(new ModulePos(0, 0)),
                 "The hold travels with the module");
     }
 
@@ -101,12 +101,12 @@ class ShipRegistryCargoTest {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(10.0));
         Ship ship = newHullAppliedShipWithCargoModule(registry);
         Map<Integer, Map<String, Object>> cargo = Map.of(2, Map.of("type", "STONE"));
-        registry.setCargo(ship.identity(), ModuleSlot.BOW, cargo);
+        registry.setCargo(ship.identity(), new ModulePos(1, 0), cargo);
         registry.transition(ship.identity(), LifecyclePhase.FINALIZED);
 
         Ship after = registry.applyDamage(ship.identity(), 1.0);
 
-        assertEquals(cargo, after.cargo().get(ModuleSlot.BOW), "Cargo must survive damage (RQCA-22)");
+        assertEquals(cargo, after.cargo().get(new ModulePos(1, 0)), "Cargo must survive damage (RQCA-22)");
     }
 
     @Test
@@ -114,11 +114,11 @@ class ShipRegistryCargoTest {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(10.0));
         Ship ship = newHullAppliedShipWithCargoModule(registry);
         Map<Integer, Map<String, Object>> cargo = Map.of(10, Map.of("type", "TORCH", "amount", 64));
-        registry.setCargo(ship.identity(), ModuleSlot.BOW, cargo);
+        registry.setCargo(ship.identity(), new ModulePos(1, 0), cargo);
 
         Ship finalized = registry.transition(ship.identity(), LifecyclePhase.FINALIZED);
 
-        assertEquals(cargo, finalized.cargo().get(ModuleSlot.BOW));
+        assertEquals(cargo, finalized.cargo().get(new ModulePos(1, 0)));
     }
 
     @Test
@@ -126,13 +126,13 @@ class ShipRegistryCargoTest {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(10.0));
         Ship ship = newHullAppliedShipWithCargoModule(registry);
         Map<Integer, Map<String, Object>> cargo = Map.of(1, Map.of("type", "IRON_INGOT"));
-        registry.setCargo(ship.identity(), ModuleSlot.BOW, cargo);
+        registry.setCargo(ship.identity(), new ModulePos(1, 0), cargo);
 
-        registry.installModule(ship.identity(), ModuleType.CANNON, ModuleSlot.STERN);
-        registry.moveModule(ship.identity(), ModuleSlot.STERN, ModuleSlot.PORT);
-        Ship after = registry.removeModule(ship.identity(), ModuleSlot.PORT);
+        registry.installModule(ship.identity(), ModuleType.CANNON, new ModulePos(1, 3));
+        registry.moveModule(ship.identity(), new ModulePos(1, 3), new ModulePos(0, 0));
+        Ship after = registry.removeModule(ship.identity(), new ModulePos(0, 0));
 
-        assertEquals(cargo, after.cargo().get(ModuleSlot.BOW),
+        assertEquals(cargo, after.cargo().get(new ModulePos(1, 0)),
                 "Cargo must survive unrelated module rearrangement");
         assertTrue(after.hasCargoModule());
     }
@@ -140,14 +140,14 @@ class ShipRegistryCargoTest {
     @Test
     void hasCargoModule_reflects_fitted_modules() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
         registry.applyHull(ship.identity(), null);
         assertFalse(registry.find(ship.identity()).orElseThrow().hasCargoModule());
 
-        registry.installModule(ship.identity(), ModuleType.CARGO, ModuleSlot.STERN);
+        registry.installModule(ship.identity(), ModuleType.CARGO, new ModulePos(1, 3));
         assertTrue(registry.find(ship.identity()).orElseThrow().hasCargoModule());
 
-        registry.removeModule(ship.identity(), ModuleSlot.STERN);
+        registry.removeModule(ship.identity(), new ModulePos(1, 3));
         assertFalse(registry.find(ship.identity()).orElseThrow().hasCargoModule());
     }
 }

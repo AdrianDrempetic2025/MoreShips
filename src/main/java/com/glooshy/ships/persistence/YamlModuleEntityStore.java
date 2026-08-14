@@ -2,7 +2,7 @@ package com.glooshy.ships.persistence;
 
 import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.runtime.ModuleEntityManager.ModuleEntityBinding;
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,10 +58,8 @@ public final class YamlModuleEntityStore implements ModuleEntityStore {
             } catch (IllegalArgumentException e) {
                 continue;
             }
-            ModuleSlot slot;
-            try {
-                slot = ModuleSlot.valueOf(String.valueOf(map.get("slot")));
-            } catch (IllegalArgumentException e) {
+            ModulePos pos = ModulePos.decode(String.valueOf(map.get("pos")));
+            if (pos == null) {
                 continue;
             }
             UUID entityUuid;
@@ -70,7 +68,7 @@ public final class YamlModuleEntityStore implements ModuleEntityStore {
             } catch (IllegalArgumentException e) {
                 continue;
             }
-            bindings.add(new ModuleEntityBinding(shipId, slot, entityUuid));
+            bindings.add(new ModuleEntityBinding(shipId, pos, entityUuid));
         }
         return bindings;
     }
@@ -82,7 +80,7 @@ public final class YamlModuleEntityStore implements ModuleEntityStore {
         for (ModuleEntityBinding binding : bindings) {
             data.add(Map.of(
                     "ship", binding.shipId().encoded(),
-                    "slot", binding.slot().name(),
+                    "pos", binding.pos().encoded(),
                     "entity", binding.entityUuid().toString()));
         }
         yaml.set("entries", data);

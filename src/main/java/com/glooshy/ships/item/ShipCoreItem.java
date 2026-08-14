@@ -1,5 +1,10 @@
 package com.glooshy.ships.item;
 
+import com.glooshy.ships.ship.ShipSize;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -13,60 +18,69 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Factory and recognizer for Ship Core items.
+ * Factory and recognizer for Ship Core items, one per {@link ShipSize}
+ * (spec L1 §2: Small/Medium/Large cores).
  *
- * <p>Base material and display name are configurable (CON-01). The
- * PersistentDataContainer marker is what the placement listener detects — not
- * the material alone, so a vanilla heart-of-the-sea does not trigger ship
- * placement even if the configured base material matches the vanilla item.
+ * <p>The PersistentDataContainer marker (value = size name) is what the
+ * placement listener detects — not the material alone, so a vanilla item of
+ * the same material never triggers ship placement.
  */
 public final class ShipCoreItem {
 
     private final NamespacedKey markerKey;
-    private final Material baseMaterial;
-    private final String displayName;
+    private final Map<ShipSize, Material> materials;
+    private final Map<ShipSize, String> displayNames;
 
-    public ShipCoreItem(NamespacedKey markerKey, Material baseMaterial, String displayName) {
-        this.markerKey = markerKey;
-        this.baseMaterial = baseMaterial;
-        this.displayName = displayName;
+    public ShipCoreItem(NamespacedKey markerKey,
+                        Map<ShipSize, Material> materials,
+                        Map<ShipSize, String> displayNames) {
+        this.markerKey = Objects.requireNonNull(markerKey, "markerKey");
+        this.materials = Map.copyOf(materials);
+        this.displayNames = Map.copyOf(displayNames);
+        for (ShipSize size : ShipSize.values()) {
+            if (!this.materials.containsKey(size) || !this.displayNames.containsKey(size)) {
+                throw new IllegalArgumentException("Missing core material or display name for " + size);
+            }
+        }
     }
 
-    public ItemStack create() {
-        ItemStack stack = new ItemStack(baseMaterial);
+    public ItemStack create(ShipSize size) {
+        ItemStack stack = new ItemStack(materials.get(size));
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(displayName, NamedTextColor.AQUA)
+        meta.displayName(Component.text(displayNames.get(size), NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.getPersistentDataContainer().set(markerKey, PersistentDataType.BYTE, (byte) 1);
+        meta.lore(List.of(
+                Component.text(size.width() + "x" + size.length() + " hull, "
+                        + size.capacity() + " module slots", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false)));
+        meta.getPersistentDataContainer().set(markerKey, PersistentDataType.STRING, size.name());
         stack.setItemMeta(meta);
         return stack;
     }
 
-    public boolean isShipCore(@NotNull ItemStack stack) {
-        if (stack.getType() != baseMaterial) {
-            return false;
-        }
+    /** The ship size of a core item, or null if the stack is not a core. */
+    public @Nullable ShipSize parseSize(@NotNull ItemStack stack) {
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) {
-            return false;
+            return null;
         }
-        PersistentDataContainer pdc = meta.getPersistentDataContainer();
-        return pdc.has(markerKey, PersistentDataType.BYTE);
+        String sizeName = meta.getPersistentDataContainer().get(markerKey, PersistentDataType.STRING);
+        if (sizeName == null) {
+            return null;
+        }
+        try {
+            ShipSize size = ShipSize.valueOf(sizeName);
+            return stack.getType() == materials.get(size) ? size : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
-    public @NotNull String diagnose(@NotNull ItemStack stack) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("type=").append(stack.getType());
-        sb.append(" amount=").append(stack.getAmount());
-        ItemMeta meta = stack.getItemMeta();
-        if (meta == null) {
-            sb.append(" meta=none");
-        } else {
-            PersistentDataContainer pdc = meta.getPersistentDataContainer();
-            sb.append(" marker=").append(pdc.has(markerKey, PersistentDataType.BYTE));
-            sb.append(" hasDisplayName=").append(meta.hasDisplayName());
-        }
-        sb.append(" isShipCore=").append(isShipCore(stack));
-        return sb.toString();
+    public String displayName(ShipSize size) {
+        return displayNames.get(size);
+    }
+
+    public Map<ShipSize, Material> materials() {
+        return new EnumMap<>(materials);
     }
 }

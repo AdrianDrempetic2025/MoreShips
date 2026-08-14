@@ -1,7 +1,7 @@
 package com.glooshy.ships.ui;
 
 import com.glooshy.ships.item.ModuleItem;
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import java.util.List;
@@ -16,7 +16,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 /**
  * Builds and refreshes the ship configuration UI (spec L1 §14): top-down
- * ship representation, module slots, statistics, finalize button.
+ * ship representation per size, module positions, statistics, finalize
+ * button.
  */
 public final class ShipConfigUi {
 
@@ -28,37 +29,36 @@ public final class ShipConfigUi {
 
     public Inventory open(Player player, Ship ship, ShipConfigUiHolder holder) {
         Inventory inventory = player.getServer().createInventory(
-                holder, ConfigUiLayout.SIZE,
-                Component.text("Ship Configuration", NamedTextColor.GOLD));
+                holder, ConfigUiLayout.inventorySize(ship.size()),
+                Component.text(ship.size() + " Ship Configuration", NamedTextColor.GOLD));
 
-        // Fillers first, then real content on top
         ItemStack filler = named(Material.GRAY_STAINED_GLASS_PANE, " ", NamedTextColor.DARK_GRAY);
-        for (int i = 0; i < ConfigUiLayout.SIZE; i++) {
+        for (int i = 0; i < ConfigUiLayout.inventorySize(ship.size()); i++) {
             inventory.setItem(i, filler);
         }
 
-        for (ModuleSlot slot : ModuleSlot.values()) {
-            inventory.setItem(ConfigUiLayout.SLOT_INDEX.get(slot), slotIcon(ship, slot));
+        for (ModulePos pos : ship.size().positions()) {
+            inventory.setItem(ConfigUiLayout.indexOf(ship.size(), pos), slotIcon(ship, pos));
         }
 
-        inventory.setItem(ConfigUiLayout.HULL_INFO_INDEX, hullInfo(ship));
-        inventory.setItem(ConfigUiLayout.STATS_INFO_INDEX, statsInfo(ship));
-        inventory.setItem(ConfigUiLayout.MODULES_INFO_INDEX, modulesInfo(ship));
-        inventory.setItem(ConfigUiLayout.HELP_INFO_INDEX, helpInfo());
-        inventory.setItem(ConfigUiLayout.FINALIZE_INDEX, finalizeButton(false));
+        inventory.setItem(ConfigUiLayout.hullInfoIndex(ship.size()), hullInfo(ship));
+        inventory.setItem(ConfigUiLayout.statsInfoIndex(ship.size()), statsInfo(ship));
+        inventory.setItem(ConfigUiLayout.modulesInfoIndex(ship.size()), modulesInfo(ship));
+        inventory.setItem(ConfigUiLayout.helpInfoIndex(ship.size()), helpInfo());
+        inventory.setItem(ConfigUiLayout.finalizeIndex(ship.size()), finalizeButton(false));
 
         player.openInventory(inventory);
         return inventory;
     }
 
-    /** Icon for a module slot: the fitted module, or an "empty" placeholder. */
-    public ItemStack slotIcon(Ship ship, ModuleSlot slot) {
-        ModuleType type = ship.modules().get(slot);
+    /** Icon for a module position: the fitted module, or an "empty" placeholder. */
+    public ItemStack slotIcon(Ship ship, ModulePos pos) {
+        ModuleType type = ship.modules().get(pos);
         if (type != null) {
             return moduleItem.create(type);
         }
         return named(Material.LIGHT_GRAY_STAINED_GLASS_PANE,
-                slot.name() + " — empty (place a module here)", NamedTextColor.GRAY);
+                pos.encoded() + " — empty (place a module here)", NamedTextColor.GRAY);
     }
 
     public ItemStack finalizeButton(boolean armed) {
@@ -82,6 +82,9 @@ public final class ShipConfigUi {
         ItemStack stack = named(Material.NETHER_STAR, "Statistics", NamedTextColor.AQUA);
         edit(stack, Component.text("HP: " + Math.max(0, ship.currentHp())
                         + " / " + Math.max(0, ship.maxHp()), NamedTextColor.WHITE),
+                Component.text("Size: " + ship.size() + " ("
+                        + ship.size().width() + "x" + ship.size().length() + ")",
+                        NamedTextColor.GRAY),
                 Component.text("Phase: " + ship.phase().name(), NamedTextColor.GRAY));
         return stack;
     }
@@ -89,7 +92,7 @@ public final class ShipConfigUi {
     private ItemStack modulesInfo(Ship ship) {
         ItemStack stack = named(Material.HOPPER, "Modules", NamedTextColor.AQUA);
         edit(stack, Component.text(ship.modules().size() + " / "
-                        + ModuleSlot.values().length + " slots used", NamedTextColor.WHITE),
+                        + ship.size().capacity() + " slots used", NamedTextColor.WHITE),
                 Component.text("Punch a module on the ship to remove it",
                         NamedTextColor.GRAY));
         return stack;

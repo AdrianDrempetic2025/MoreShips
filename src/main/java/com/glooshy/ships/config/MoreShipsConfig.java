@@ -1,6 +1,7 @@
 package com.glooshy.ships.config;
 
 import com.glooshy.ships.ship.ModuleType;
+import com.glooshy.ships.ship.ShipSize;
 import java.util.EnumMap;
 import java.util.Map;
 import org.bukkit.Material;
@@ -24,14 +25,41 @@ public final class MoreShipsConfig {
         this.config = config;
     }
 
-    public @NotNull Material shipCoreBaseMaterial() {
-        String name = config.getString("shipCore.baseMaterial", "HEART_OF_THE_SEA");
-        Material resolved = Material.matchMaterial(name);
-        return resolved != null ? resolved : Material.HEART_OF_THE_SEA;
+    private static final Map<ShipSize, Material> DEFAULT_CORE_MATERIALS = Map.of(
+            ShipSize.SMALL, Material.HEART_OF_THE_SEA,
+            ShipSize.MEDIUM, Material.NAUTILUS_SHELL,
+            ShipSize.LARGE, Material.DRAGON_EGG);
+
+    public @NotNull Material shipCoreMaterial(@NotNull ShipSize size) {
+        String name = config.getString("shipCore." + size.name().toLowerCase() + ".material");
+        if (name != null) {
+            Material resolved = Material.matchMaterial(name);
+            if (resolved != null) {
+                return resolved;
+            }
+        }
+        return DEFAULT_CORE_MATERIALS.get(size);
     }
 
-    public @NotNull String shipCoreDisplayName() {
-        return config.getString("shipCore.displayName", "Ship Core");
+    public @NotNull Map<ShipSize, Material> shipCoreMaterials() {
+        Map<ShipSize, Material> materials = new EnumMap<>(ShipSize.class);
+        for (ShipSize size : ShipSize.values()) {
+            materials.put(size, shipCoreMaterial(size));
+        }
+        return materials;
+    }
+
+    public @NotNull String shipCoreDisplayName(@NotNull ShipSize size) {
+        return config.getString("shipCore." + size.name().toLowerCase() + ".displayName",
+                size.name().charAt(0) + size.name().substring(1).toLowerCase() + " Ship Core");
+    }
+
+    public @NotNull Map<ShipSize, String> shipCoreDisplayNames() {
+        Map<ShipSize, String> names = new EnumMap<>(ShipSize.class);
+        for (ShipSize size : ShipSize.values()) {
+            names.put(size, shipCoreDisplayName(size));
+        }
+        return names;
     }
 
     public double spawnOffsetX() {

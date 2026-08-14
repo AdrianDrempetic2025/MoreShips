@@ -26,7 +26,7 @@ class ShipRegistryHullApplicationTest {
     @Test
     void applyHull_transitions_unfinished_to_hull_applied() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         Ship updated = registry.applyHull(ship.identity(), null);
 
@@ -39,7 +39,7 @@ class ShipRegistryHullApplicationTest {
     @Test
     void applyHull_stores_hull_material_reference() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         // Pass a sentinel non-null value; we use a String-marked Object since
         // Material can't be referenced in unit tests. The registry stores whatever
@@ -52,7 +52,7 @@ class ShipRegistryHullApplicationTest {
     @Test
     void applyHull_throws_for_non_unfinished_ship() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
         registry.applyHull(ship.identity(), null);
 
         // Already HULL_APPLIED — applying again must throw
@@ -74,7 +74,7 @@ class ShipRegistryHullApplicationTest {
     void new_ship_has_null_hull_material() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
 
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         assertNull(ship.hullMaterial(), "Newly created ships have no hull material");
     }
@@ -82,7 +82,7 @@ class ShipRegistryHullApplicationTest {
     @Test
     void applyHull_concurrent_only_one_wins() throws Exception {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
-        Ship ship = registry.createShip();
+        Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         int threads = 8;
         Thread[] pool = new Thread[threads];

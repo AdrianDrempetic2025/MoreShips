@@ -90,11 +90,12 @@ public final class ShipCorePlacementListener implements Listener {
         if (target == null || !isWaterBlock(target)) {
             return;
         }
-        if (!shipCoreItem.isShipCore(inHand)) {
+        com.glooshy.ships.ship.ShipSize coreSize = shipCoreItem.parseSize(inHand);
+        if (coreSize == null) {
             return;
         }
 
-        Ship ship = shipRegistry.createShip();
+        Ship ship = shipRegistry.createShip(coreSize);
 
         Location spawnLoc = target.getLocation().add(spawnOffsetX, spawnOffsetY, spawnOffsetZ);
         UUID entityUuid = entitySpawner.spawnUnfinishedShip(spawnLoc, ship.identity());
@@ -134,7 +135,7 @@ public final class ShipCorePlacementListener implements Listener {
         sb.append("action=").append(action);
         sb.append(" clicked=").append(clicked == null ? "null" : clicked.getType());
         sb.append(" target=").append(target == null ? "null" : target.getType());
-        sb.append(" item=[").append(shipCoreItem.diagnose(inHand)).append("]");
+        sb.append(" item=[").append(shipCoreItem.parseSize(inHand)).append("]");
         return sb.toString();
     }
 }

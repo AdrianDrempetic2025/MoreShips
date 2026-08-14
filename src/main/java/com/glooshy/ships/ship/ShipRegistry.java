@@ -3,7 +3,7 @@ package com.glooshy.ships.ship;
 import com.glooshy.ships.hull.HpCalculator;
 import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.identity.ShipIdentityGenerator;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -15,16 +15,19 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Authoritative owner of the live ship set + ship lifecycle state + hull
- * material + HP.
+ * Authoritative owner of the live ship set + ship lifecycle state + size +
+ * hull material + HP + module arrangement + cargo holds.
  *
- * <p>Every ship starts in {@link LifecyclePhase#UNFINISHED} with null hull
- * material and HP=-1. Hull application transitions UNFINISHED → HULL_APPLIED,
- * stores the hull material, and computes max HP via {@link HpCalculator}.
- * Damage reduces current HP; at 0, callers transition to DESTROYED.
+ * <p>Every ship starts in {@link LifecyclePhase#UNFINISHED} with a fixed
+ * {@link ShipSize}, null hull material and HP=-1. Hull application
+ * transitions UNFINISHED → HULL_APPLIED, stores the hull material, and
+ * computes max HP via {@link HpCalculator}. Damage reduces current HP; at 0,
+ * callers transition to DESTROYED.
  *
- * <p>Transition to {@link LifecyclePhase#REMOVED} or {@link
- * LifecyclePhase#DESTROYED} deletes the entry entirely.
+ * <p>Modules fit only at positions valid for the ship's size
+ * ({@link ShipSize#isValid}) and only while HULL_APPLIED. Transition to
+ * {@link LifecyclePhase#REMOVED} or {@link LifecyclePhase#DESTROYED} deletes
+ * the entry entirely.
  */
 public final class ShipRegistry {
 
@@ -37,9 +40,10 @@ public final class ShipRegistry {
         this.hpCalculator = Objects.requireNonNull(hpCalculator, "hpCalculator");
     }
 
-    public Ship createShip() {
+    public Ship createShip(ShipSize size) {
+        Objects.requireNonNull(size, "size");
         ShipIdentity identity = generator.generate();
-        Ship ship = new Ship(identity, LifecyclePhase.UNFINISHED, null);
+        Ship ship = new Ship(identity, size, LifecyclePhase.UNFINISHED, null);
 
         Ship existing = ships.putIfAbsent(identity, ship);
         if (existing != null) {
@@ -61,7 +65,7 @@ public final class ShipRegistry {
                                 + " (only UNFINISHED ships accept hull)");
             }
             int maxHp = hullMaterial != null ? hpCalculator.computeMaxHp(hullMaterial.getHardness()) : -1;
-            return new Ship(key, LifecyclePhase.HULL_APPLIED, hullMaterial, maxHp, maxHp,
+            return new Ship(key, current.size(), LifecyclePhase.HULL_APPLIED, hullMaterial, maxHp, maxHp,
                     current.modules(), current.cargo());
         });
     }
@@ -86,22 +90,24 @@ public final class ShipRegistry {
                                 + " (only FINALIZED ships take damage)");
             }
             int newHp = Math.max(0, current.currentHp() - (int) Math.round(amount));
-            return new Ship(key, current.phase(), current.hullMaterial(), newHp, current.maxHp(),
-                    current.modules(), current.cargo());
+            return new Ship(key, current.size(), current.phase(), current.hullMaterial(), newHp,
+                    current.maxHp(), current.modules(), current.cargo());
         });
     }
 
     /**
-     * Install a module into a slot on a HULL_APPLIED ship (RQCA-08). Returns
-     * the updated ship.
+     * Install a module at a hull position on a HULL_APPLIED ship (RQCA-08).
+     * Returns the updated ship.
      *
      * @throws IllegalStateException if the ship is not found, not in
-     *                               HULL_APPLIED phase, or the slot is occupied
+     *                               HULL_APPLIED phase, the position is not
+     *                               valid for its size, or the position is
+     *                               occupied
      */
-    public Ship installModule(ShipIdentity identity, ModuleType type, ModuleSlot slot) {
+    public Ship installModule(ShipIdentity identity, ModuleType type, ModulePos pos) {
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(type, "type");
-        Objects.requireNonNull(slot, "slot");
+        Objects.requireNonNull(pos, "pos");
         return ships.compute(identity, (key, current) -> {
             if (current == null) {
                 throw new IllegalStateException("Ship not found: " + identity);
@@ -111,28 +117,33 @@ public final class ShipRegistry {
                         "Cannot install module on ship in phase " + current.phase()
                                 + " (only HULL_APPLIED ships accept modules)");
             }
-            if (current.modules().containsKey(slot)) {
+            if (!current.size().isValid(pos)) {
                 throw new IllegalStateException(
-                        "Slot " + slot + " is already occupied by a " + current.modules().get(slot));
+                        "Position " + pos.encoded() + " is not a module slot on a "
+                                + current.size() + " ship");
             }
-            EnumMap<ModuleSlot, ModuleType> modules = new EnumMap<>(ModuleSlot.class);
-            modules.putAll(current.modules());
-            modules.put(slot, type);
-            return new Ship(key, current.phase(), current.hullMaterial(),
+            if (current.modules().containsKey(pos)) {
+                throw new IllegalStateException(
+                        "Position " + pos.encoded() + " is already occupied by a "
+                                + current.modules().get(pos));
+            }
+            Map<ModulePos, ModuleType> modules = new HashMap<>(current.modules());
+            modules.put(pos, type);
+            return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
                     current.currentHp(), current.maxHp(), Map.copyOf(modules), current.cargo());
         });
     }
 
     /**
-     * Remove the module from a slot on a HULL_APPLIED ship (RQCA-08). Returns
-     * the updated ship.
+     * Remove the module at a hull position on a HULL_APPLIED ship (RQCA-08).
+     * Returns the updated ship.
      *
      * @throws IllegalStateException if the ship is not found, not in
-     *                               HULL_APPLIED phase, or the slot is empty
+     *                               HULL_APPLIED phase, or the position is empty
      */
-    public Ship removeModule(ShipIdentity identity, ModuleSlot slot) {
+    public Ship removeModule(ShipIdentity identity, ModulePos pos) {
         Objects.requireNonNull(identity, "identity");
-        Objects.requireNonNull(slot, "slot");
+        Objects.requireNonNull(pos, "pos");
         return ships.compute(identity, (key, current) -> {
             if (current == null) {
                 throw new IllegalStateException("Ship not found: " + identity);
@@ -142,26 +153,29 @@ public final class ShipRegistry {
                         "Cannot remove module from ship in phase " + current.phase()
                                 + " (only HULL_APPLIED ships accept module changes)");
             }
-            if (!current.modules().containsKey(slot)) {
-                throw new IllegalStateException("Slot " + slot + " is empty");
+            if (!current.modules().containsKey(pos)) {
+                throw new IllegalStateException("Position " + pos.encoded() + " is empty");
             }
-            EnumMap<ModuleSlot, ModuleType> modules = new EnumMap<>(ModuleSlot.class);
-            modules.putAll(current.modules());
-            modules.remove(slot);
-            return new Ship(key, current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), Map.copyOf(modules), current.cargo());
+            Map<ModulePos, ModuleType> modules = new HashMap<>(current.modules());
+            modules.remove(pos);
+            // A removed cargo module takes its hold out of the ship state; the
+            // interaction layer drops the contents (RQCA-22).
+            Map<ModulePos, Map<Integer, Map<String, Object>>> cargo = new HashMap<>(current.cargo());
+            cargo.remove(pos);
+            return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules), Map.copyOf(cargo));
         });
     }
 
     /**
-     * Move the module from one slot to another (free) slot on a HULL_APPLIED
-     * ship (RQCA-08). Returns the updated ship.
+     * Move the module from one position to another (free) position on a
+     * HULL_APPLIED ship (RQCA-08). Returns the updated ship.
      *
      * @throws IllegalStateException if the ship is not found, not in
-     *                               HULL_APPLIED phase, the source slot is
-     *                               empty, or the target slot is occupied
+     *                               HULL_APPLIED phase, the source is empty,
+     *                               or the target is occupied/invalid
      */
-    public Ship moveModule(ShipIdentity identity, ModuleSlot from, ModuleSlot to) {
+    public Ship moveModule(ShipIdentity identity, ModulePos from, ModulePos to) {
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(from, "from");
         Objects.requireNonNull(to, "to");
@@ -175,25 +189,51 @@ public final class ShipRegistry {
                                 + " (only HULL_APPLIED ships accept module changes)");
             }
             if (!current.modules().containsKey(from)) {
-                throw new IllegalStateException("Source slot " + from + " is empty");
+                throw new IllegalStateException("Source position " + from.encoded() + " is empty");
+            }
+            if (!current.size().isValid(to)) {
+                throw new IllegalStateException(
+                        "Target position " + to.encoded() + " is not a module slot on a "
+                                + current.size() + " ship");
             }
             if (current.modules().containsKey(to)) {
                 throw new IllegalStateException(
-                        "Target slot " + to + " is already occupied by a " + current.modules().get(to));
+                        "Target position " + to.encoded() + " is already occupied by a "
+                                + current.modules().get(to));
             }
-            EnumMap<ModuleSlot, ModuleType> modules = new EnumMap<>(ModuleSlot.class);
-            modules.putAll(current.modules());
+            Map<ModulePos, ModuleType> modules = new HashMap<>(current.modules());
             modules.put(to, modules.remove(from));
             // The module's cargo hold travels with the module
-            Map<ModuleSlot, Map<Integer, Map<String, Object>>> cargo =
-                    new EnumMap<>(ModuleSlot.class);
-            cargo.putAll(current.cargo());
+            Map<ModulePos, Map<Integer, Map<String, Object>>> cargo = new HashMap<>(current.cargo());
             Map<Integer, Map<String, Object>> hold = cargo.remove(from);
             if (hold != null) {
                 cargo.put(to, hold);
             }
-            return new Ship(key, current.phase(), current.hullMaterial(),
+            return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
                     current.currentHp(), current.maxHp(), Map.copyOf(modules), Map.copyOf(cargo));
+        });
+    }
+
+    /**
+     * Replace the cargo hold of one module position (RQCA-21/22). Bulk setter —
+     * the caller serializes the whole inventory and hands it over.
+     *
+     * @throws IllegalStateException if the ship is not found
+     */
+    public Ship setCargo(ShipIdentity identity, ModulePos pos,
+                         Map<Integer, Map<String, Object>> contents) {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(pos, "pos");
+        Objects.requireNonNull(contents, "contents");
+        return ships.compute(identity, (key, current) -> {
+            if (current == null) {
+                throw new IllegalStateException("Ship not found: " + identity);
+            }
+            Map<ModulePos, Map<Integer, Map<String, Object>>> cargo =
+                    new HashMap<>(current.cargo());
+            cargo.put(pos, Map.copyOf(contents));
+            return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
+                    current.currentHp(), current.maxHp(), current.modules(), Map.copyOf(cargo));
         });
     }
 
@@ -212,33 +252,8 @@ public final class ShipRegistry {
             if (newPhase == LifecyclePhase.REMOVED || newPhase == LifecyclePhase.DESTROYED) {
                 return null;
             }
-            return new Ship(key, newPhase, current.hullMaterial(),
+            return new Ship(key, current.size(), newPhase, current.hullMaterial(),
                     current.currentHp(), current.maxHp(), current.modules(), current.cargo());
-        });
-    }
-
-    /**
-     * Replace the cargo hold of one module slot (RQCA-21/22). Bulk setter —
-     * the caller serializes the whole inventory and hands it over.
-     *
-     * @throws IllegalStateException if the ship is not found
-     */
-    public Ship setCargo(ShipIdentity identity, ModuleSlot slot,
-                         Map<Integer, Map<String, Object>> contents) {
-        Objects.requireNonNull(identity, "identity");
-        Objects.requireNonNull(slot, "slot");
-        Objects.requireNonNull(contents, "contents");
-        return ships.compute(identity, (key, current) -> {
-            if (current == null) {
-                throw new IllegalStateException("Ship not found: " + identity);
-            }
-            Map<ModuleSlot, Map<Integer, Map<String, Object>>> cargo =
-                    new EnumMap<>(ModuleSlot.class);
-            cargo.putAll(current.cargo());
-            cargo.put(slot, Map.copyOf(contents));
-            return new Ship(key, current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), current.modules(),
-                    Map.copyOf(cargo));
         });
     }
 

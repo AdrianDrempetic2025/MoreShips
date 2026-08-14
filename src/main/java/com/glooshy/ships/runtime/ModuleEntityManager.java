@@ -2,10 +2,11 @@ package com.glooshy.ships.runtime;
 
 import com.glooshy.ships.identity.ShipIdentity;
 import com.glooshy.ships.item.ModuleItem;
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
+import com.glooshy.ships.ship.ShipSize;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,7 @@ import org.jetbrains.annotations.NotNull;
 public final class ModuleEntityManager {
 
     /** Durable ship → module-entity binding, persisted across restarts. */
-    public record ModuleEntityBinding(ShipIdentity shipId, ModuleSlot slot, UUID entityUuid) {
+    public record ModuleEntityBinding(ShipIdentity shipId, ModulePos pos, UUID entityUuid) {
     }
 
     private final NamespacedKey shipIdKey;
@@ -47,7 +48,7 @@ public final class ModuleEntityManager {
     private final ModuleItem moduleItem;
 
     private final Map<UUID, ModuleEntityBinding> byEntity = new ConcurrentHashMap<>();
-    private final Map<ShipIdentity, Map<ModuleSlot, UUID>> byShip = new ConcurrentHashMap<>();
+    private final Map<ShipIdentity, Map<ModulePos, UUID>> byShip = new ConcurrentHashMap<>();
 
     public ModuleEntityManager(NamespacedKey shipIdKey,
                                NamespacedKey slotKey,
@@ -67,8 +68,8 @@ public final class ModuleEntityManager {
     }
 
     /** Spawn the module entity for a newly installed module. */
-    public void spawn(Ship ship, ModuleSlot slot) {
-        ModuleType type = ship.modules().get(slot);
+    public void spawn(Ship ship, ModulePos pos) {
+        ModuleType type = ship.modules().get(pos);
         if (type == null) {
             return;
         }
@@ -76,11 +77,11 @@ public final class ModuleEntityManager {
         if (base == null) {
             return;
         }
-        despawn(ship.identity(), slot);
-        spawnStand(ship.identity(), slot, type, moduleLocation(base, ship.identity(), slot));
+        despawn(ship.identity(), pos);
+        spawnStand(ship.identity(), pos, type, moduleLocation(base, ship.identity(), pos));
     }
 
-    private ArmorStand spawnStand(ShipIdentity shipId, ModuleSlot slot, ModuleType type, Location loc) {
+    private ArmorStand spawnStand(ShipIdentity shipId, ModulePos pos, ModuleType type, Location loc) {
         ArmorStand stand = loc.getWorld().spawn(loc, ArmorStand.class, as -> {
             as.setGravity(false);
             as.setInvisible(true);
@@ -93,20 +94,20 @@ public final class ModuleEntityManager {
             as.getEquipment().setHelmet(moduleItem.create(type));
             as.getPersistentDataContainer().set(shipIdKey, PersistentDataType.STRING,
                     shipId.encoded());
-            as.getPersistentDataContainer().set(slotKey, PersistentDataType.STRING, slot.name());
+            as.getPersistentDataContainer().set(slotKey, PersistentDataType.STRING, pos.encoded());
         });
-        byEntity.put(stand.getUniqueId(), new ModuleEntityBinding(shipId, slot, stand.getUniqueId()));
-        byShip.computeIfAbsent(shipId, k -> new ConcurrentHashMap<>()).put(slot, stand.getUniqueId());
+        byEntity.put(stand.getUniqueId(), new ModuleEntityBinding(shipId, pos, stand.getUniqueId()));
+        byShip.computeIfAbsent(shipId, k -> new ConcurrentHashMap<>()).put(pos, stand.getUniqueId());
         return stand;
     }
 
     /** Remove the module entity (module removed / moved). */
-    public void despawn(ShipIdentity shipId, ModuleSlot slot) {
-        Map<ModuleSlot, UUID> slots = byShip.get(shipId);
+    public void despawn(ShipIdentity shipId, ModulePos pos) {
+        Map<ModulePos, UUID> slots = byShip.get(shipId);
         if (slots == null) {
             return;
         }
-        UUID uuid = slots.remove(slot);
+        UUID uuid = slots.remove(pos);
         if (uuid == null) {
             return;
         }
@@ -122,8 +123,8 @@ public final class ModuleEntityManager {
 
     /** Remove all module entities of a ship (teardown / destruction). */
     public void despawnAll(ShipIdentity shipId) {
-        for (ModuleSlot slot : ModuleSlot.values()) {
-            despawn(shipId, slot);
+        for (ModulePos pos : List.copyOf(byShip.getOrDefault(shipId, Map.of()).keySet())) {
+            despawn(shipId, pos);
         }
     }
 
@@ -142,30 +143,30 @@ public final class ModuleEntityManager {
         }
 
         // Self-heal: registry modules without a live entity get respawned
-        for (Map.Entry<ModuleSlot, ModuleType> entry : ship.modules().entrySet()) {
-            ModuleSlot slot = entry.getKey();
-            UUID uuid = byShip.getOrDefault(shipId, Map.of()).get(slot);
+        for (Map.Entry<ModulePos, ModuleType> entry : ship.modules().entrySet()) {
+            ModulePos pos = entry.getKey();
+            UUID uuid = byShip.getOrDefault(shipId, Map.of()).get(pos);
             var existing = uuid == null ? null : Bukkit.getEntity(uuid);
             if (existing == null || existing.isDead()) {
                 if (uuid != null) {
                     byEntity.remove(uuid);
                 }
-                spawnStand(shipId, slot, entry.getValue(), moduleLocation(base, shipId, slot));
+                spawnStand(shipId, pos, entry.getValue(), moduleLocation(base, shipId, pos));
             }
         }
 
-        // Clean ghosts: entities for slots the ship no longer has
-        Map<ModuleSlot, UUID> slots = byShip.get(shipId);
-        if (slots != null) {
-            for (ModuleSlot slot : List.copyOf(slots.keySet())) {
-                if (!ship.modules().containsKey(slot)) {
-                    despawn(shipId, slot);
+        // Clean ghosts: entities for positions the ship no longer has
+        Map<ModulePos, UUID> positions = byShip.get(shipId);
+        if (positions != null) {
+            for (ModulePos pos : List.copyOf(positions.keySet())) {
+                if (!ship.modules().containsKey(pos)) {
+                    despawn(shipId, pos);
                 }
             }
         }
 
         // Position + rotate
-        for (Map.Entry<ModuleSlot, ModuleType> entry : ship.modules().entrySet()) {
+        for (Map.Entry<ModulePos, ModuleType> entry : ship.modules().entrySet()) {
             UUID uuid = byShip.getOrDefault(shipId, Map.of()).get(entry.getKey());
             var entity = uuid == null ? null : Bukkit.getEntity(uuid);
             if (entity == null || entity.isDead()) {
@@ -184,12 +185,12 @@ public final class ModuleEntityManager {
     public void load(@NotNull List<ModuleEntityBinding> bindings) {
         for (ModuleEntityBinding binding : bindings) {
             Optional<Ship> ship = shipRegistry.find(binding.shipId());
-            if (ship.isEmpty() || !ship.get().modules().containsKey(binding.slot())) {
+            if (ship.isEmpty() || !ship.get().modules().containsKey(binding.pos())) {
                 continue; // Stale entry — registry wins, follow() will respawn if needed
             }
             byEntity.put(binding.entityUuid(), binding);
             byShip.computeIfAbsent(binding.shipId(), k -> new ConcurrentHashMap())
-                    .put(binding.slot(), binding.entityUuid());
+                    .put(binding.pos(), binding.entityUuid());
         }
     }
 
@@ -209,9 +210,14 @@ public final class ModuleEntityManager {
         return entity.getLocation();
     }
 
-    private Location moduleLocation(Location base, ShipIdentity shipId, ModuleSlot slot) {
-        double[] offset = ModuleSlot.worldOffset(base.getYaw(), slot.localX(), slot.localZ());
-        Location loc = base.clone().add(offset[0], ModuleSlot.Y_OFFSET, offset[1]);
+    private Location moduleLocation(Location base, ShipIdentity shipId, ModulePos pos) {
+        Optional<Ship> shipOpt = shipRegistry.find(shipId);
+        if (shipOpt.isEmpty()) {
+            return base.clone();
+        }
+        ShipSize size = shipOpt.get().size();
+        double[] offset = ModulePos.worldOffset(base.getYaw(), pos.localX(size), pos.localZ(size));
+        Location loc = base.clone().add(offset[0], 0.35, offset[1]);
         loc.setYaw(base.getYaw());
         loc.setPitch(0f);
         return loc;

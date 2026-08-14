@@ -1,53 +1,105 @@
 package com.glooshy.ships.ui;
 
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
+import com.glooshy.ships.ship.ShipSize;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Pure layout of the ship configuration UI (spec L1 §12/14, RQCA-09):
- * a 5×9 chest inventory representing the ship top-down — BOW at the top,
- * STERN at the bottom, PORT on the left, STARBOARD on the right, exactly
- * matching the physical module positions around the ship.
+ * a chest inventory representing the ship top-down. BOW/pramac at the top,
+ * STERN/krma at the bottom, PORT on the left, STARBOARD on the right — the
+ * UI arrangement mirrors the physical module positions on the hull grid.
+ *
+ * <p>Layouts are defined per {@link ShipSize}; large ships get a 6-row
+ * inventory, small and medium a 5-row one.
  */
 public final class ConfigUiLayout {
 
-    public static final int SIZE = 45;
+    private static final Map<ShipSize, Map<ModulePos, Integer>> LAYOUT = buildLayout();
+    private static final Map<ShipSize, Integer> SIZE = Map.of(
+            ShipSize.SMALL, 45, ShipSize.MEDIUM, 45, ShipSize.LARGE, 54);
 
-    /** Top-down: pramac gore, krma dolje, lijevo/desno po bokovima. */
-    public static final Map<ModuleSlot, Integer> SLOT_INDEX = Map.of(
-            ModuleSlot.BOW, 4,
-            ModuleSlot.PORT, 12,
-            ModuleSlot.STARBOARD, 14,
-            ModuleSlot.STERN, 40);
+    private static Map<ShipSize, Map<ModulePos, Integer>> buildLayout() {
+        Map<ShipSize, Map<ModulePos, Integer>> layout = new HashMap<>();
 
-    /** Finalize button (bottom-right). */
-    public static final int FINALIZE_INDEX = 44;
+        // SMALL: 2 stern positions side by side near the bottom (r2c0/r2c1)
+        Map<ModulePos, Integer> small = new HashMap<>();
+        small.put(new ModulePos(0, 2), 30);
+        small.put(new ModulePos(1, 2), 32);
+        layout.put(ShipSize.SMALL, Map.copyOf(small));
 
-    /** Info items. */
-    public static final int HULL_INFO_INDEX = 0;
-    public static final int STATS_INFO_INDEX = 8;
-    public static final int MODULES_INFO_INDEX = 36;
-    public static final int HELP_INFO_INDEX = 38;
+        // MEDIUM: bow row on top, stern row on the bottom
+        Map<ModulePos, Integer> medium = new HashMap<>();
+        medium.put(new ModulePos(0, 0), 3);
+        medium.put(new ModulePos(1, 0), 4);
+        medium.put(new ModulePos(2, 0), 5);
+        medium.put(new ModulePos(0, 3), 39);
+        medium.put(new ModulePos(1, 3), 40);
+        medium.put(new ModulePos(2, 3), 41);
+        layout.put(ShipSize.MEDIUM, Map.copyOf(medium));
 
-    private static final Map<Integer, ModuleSlot> INDEX_SLOT = Map.of(
-            4, ModuleSlot.BOW,
-            12, ModuleSlot.PORT,
-            14, ModuleSlot.STARBOARD,
-            40, ModuleSlot.STERN);
+        // LARGE: bow row top, stern row bottom, side pairs down the middle
+        Map<ModulePos, Integer> large = new HashMap<>();
+        large.put(new ModulePos(0, 0), 3);
+        large.put(new ModulePos(1, 0), 4);
+        large.put(new ModulePos(2, 0), 5);
+        large.put(new ModulePos(0, 2), 12);
+        large.put(new ModulePos(2, 2), 14);
+        large.put(new ModulePos(0, 4), 30);
+        large.put(new ModulePos(2, 4), 32);
+        large.put(new ModulePos(0, 5), 39);
+        large.put(new ModulePos(2, 5), 41);
+        large.put(new ModulePos(0, 7), 48);
+        large.put(new ModulePos(1, 7), 49);
+        large.put(new ModulePos(2, 7), 50);
+        layout.put(ShipSize.LARGE, Map.copyOf(large));
 
-    /** The module slot an inventory index represents, if any. */
-    public static ModuleSlot slotAt(int index) {
-        return INDEX_SLOT.get(index);
+        return layout;
     }
 
-    public static boolean isModuleSlot(int index) {
-        return INDEX_SLOT.containsKey(index);
+    public static int inventorySize(ShipSize size) {
+        return SIZE.get(size);
     }
 
-    public static boolean isInfoIndex(int index) {
-        return index == HULL_INFO_INDEX || index == STATS_INFO_INDEX
-                || index == MODULES_INFO_INDEX || index == HELP_INFO_INDEX
-                || index == FINALIZE_INDEX;
+    /** UI index of a module position for a given ship size. */
+    public static int indexOf(ShipSize size, ModulePos pos) {
+        Integer index = LAYOUT.get(size).get(pos);
+        if (index == null) {
+            throw new IllegalArgumentException(
+                    pos.encoded() + " has no UI slot on a " + size + " ship");
+        }
+        return index;
+    }
+
+    /** The module position an inventory index represents, if any. */
+    public static ModulePos posAt(ShipSize size, int index) {
+        for (Map.Entry<ModulePos, Integer> e : LAYOUT.get(size).entrySet()) {
+            if (e.getValue() == index) {
+                return e.getKey();
+            }
+        }
+        return null;
+    }
+
+    public static int finalizeIndex(ShipSize size) {
+        return size == ShipSize.LARGE ? 53 : 44;
+    }
+
+    public static int hullInfoIndex(ShipSize size) {
+        return 0;
+    }
+
+    public static int statsInfoIndex(ShipSize size) {
+        return 8;
+    }
+
+    public static int modulesInfoIndex(ShipSize size) {
+        return size == ShipSize.LARGE ? 45 : 36;
+    }
+
+    public static int helpInfoIndex(ShipSize size) {
+        return size == ShipSize.LARGE ? 47 : 38;
     }
 
     private ConfigUiLayout() {

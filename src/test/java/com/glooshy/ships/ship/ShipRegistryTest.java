@@ -30,8 +30,8 @@ class ShipRegistryTest {
     void createShip_produces_distinct_identities() {
         ShipRegistry registry = new ShipRegistry(ShipIdentityGenerator.uuid(), new com.glooshy.ships.hull.HpCalculator(10.0));
 
-        Ship first = registry.createShip();
-        Ship second = registry.createShip();
+        Ship first = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
+        Ship second = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
         assertNotEquals(first.identity(), second.identity(),
                 "Two ships must have distinct identities (DEFECT-01)");
@@ -52,7 +52,7 @@ class ShipRegistryTest {
         Set<ShipIdentity> seen = new HashSet<>();
 
         for (int i = 0; i < 1000; i++) {
-            Ship ship = registry.createShip();
+            Ship ship = registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
             assertTrue(seen.add(ship.identity()),
                     "Identity " + ship.identity() + " appeared more than once");
         }
@@ -67,9 +67,9 @@ class ShipRegistryTest {
         ShipIdentityGenerator constant = constantGenerator();
         ShipRegistry registry = new ShipRegistry(constant, new com.glooshy.ships.hull.HpCalculator(10.0));
 
-        registry.createShip();
+        registry.createShip(com.glooshy.ships.ship.ShipSize.MEDIUM);
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, registry::createShip);
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> registry.createShip(com.glooshy.ships.ship.ShipSize.SMALL));
         assertTrue(ex.getMessage().contains("collision"),
                 "Collision message must mention collision");
     }

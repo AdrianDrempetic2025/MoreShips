@@ -55,7 +55,7 @@ class ShipTeardownServiceTest {
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
-        Ship ship = ships.createShip();
+        Ship ship = ships.createShip(com.glooshy.ships.ship.ShipSize.SMALL);
         UUID entityUuid = UUID.randomUUID();
         bindings.bind(RuntimeBinding.active(ship.identity(), entityUuid));
 
@@ -80,7 +80,7 @@ class ShipTeardownServiceTest {
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
-        Ship ship = ships.createShip();
+        Ship ship = ships.createShip(com.glooshy.ships.ship.ShipSize.SMALL);
         UUID entityUuid = UUID.randomUUID();
         bindings.bind(RuntimeBinding.active(ship.identity(), entityUuid));
 
@@ -100,7 +100,7 @@ class ShipTeardownServiceTest {
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
-        Ship ship = ships.createShip();
+        Ship ship = ships.createShip(com.glooshy.ships.ship.ShipSize.SMALL);
         ships.transition(ship.identity(), LifecyclePhase.HULL_APPLIED);
         bindings.bind(RuntimeBinding.active(ship.identity(), UUID.randomUUID()));
 
@@ -123,7 +123,7 @@ class ShipTeardownServiceTest {
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
-        Ship ship = ships.createShip();
+        Ship ship = ships.createShip(com.glooshy.ships.ship.ShipSize.SMALL);
         ships.transition(ship.identity(), LifecyclePhase.HULL_APPLIED);
         ships.transition(ship.identity(), LifecyclePhase.FINALIZED);
 
@@ -139,7 +139,7 @@ class ShipTeardownServiceTest {
         RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
         ShipTeardownService service = new ShipTeardownService(ships, bindings);
 
-        ShipIdentity id = ships.createShip().identity();
+        ShipIdentity id = ships.createShip(com.glooshy.ships.ship.ShipSize.SMALL).identity();
         ships.transition(id, LifecyclePhase.HULL_APPLIED);
         ships.transition(id, LifecyclePhase.FINALIZED);
         ships.transition(id, LifecyclePhase.DESTROYED);

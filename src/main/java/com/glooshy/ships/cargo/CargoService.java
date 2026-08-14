@@ -1,6 +1,6 @@
 package com.glooshy.ships.cargo;
 
-import com.glooshy.ships.ship.ModuleSlot;
+import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
@@ -28,21 +28,21 @@ public final class CargoService {
     }
 
     /** Open the cargo hold of one specific cargo module for the player. */
-    public void open(Player player, Ship ship, ModuleSlot slot) {
-        ModuleType type = ship.modules().get(slot);
+    public void open(Player player, Ship ship, ModulePos pos) {
+        ModuleType type = ship.modules().get(pos);
         if (type != ModuleType.CARGO) {
             player.sendMessage(Component.text(
-                    "No cargo module in slot " + slot.name().toLowerCase() + ".",
+                    "No cargo module at " + pos.encoded() + ".",
                     NamedTextColor.RED));
             return;
         }
 
         Inventory inventory = player.getServer().createInventory(
-                new CargoHolder(ship.identity(), slot),
+                new CargoHolder(ship.identity(), pos),
                 Ship.cargoHoldSize(),
-                Component.text("Cargo " + slot.name(), NamedTextColor.GOLD));
+                Component.text("Cargo " + pos.encoded(), NamedTextColor.GOLD));
 
-        ship.cargo().getOrDefault(slot, Map.of()).forEach((index, itemMap) -> {
+        ship.cargo().getOrDefault(pos, Map.of()).forEach((index, itemMap) -> {
             if (index < 0 || index >= Ship.cargoHoldSize()) {
                 return;
             }
@@ -69,7 +69,7 @@ public final class CargoService {
             contents.put(index, item.serialize());
         }
         try {
-            shipRegistry.setCargo(holder.shipId(), holder.slot(), contents);
+            shipRegistry.setCargo(holder.shipId(), holder.pos(), contents);
             return true;
         } catch (IllegalStateException e) {
             return false; // Ship destroyed between open and close

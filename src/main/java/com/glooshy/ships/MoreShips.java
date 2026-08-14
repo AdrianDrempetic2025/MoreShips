@@ -73,8 +73,8 @@ public final class MoreShips extends JavaPlugin {
 
         ShipCoreItem shipCoreItem = new ShipCoreItem(
                 shipCoreMarker,
-                config.shipCoreBaseMaterial(),
-                config.shipCoreDisplayName());
+                config.shipCoreMaterials(),
+                config.shipCoreDisplayNames());
         ModuleItem moduleItem = new ModuleItem(
                 moduleMarker,
                 config.moduleMaterials(),
@@ -88,7 +88,8 @@ public final class MoreShips extends JavaPlugin {
         moduleEntities = new ModuleEntityManager(
                 shipIdKey, moduleSlotKey, shipRegistry, bindingRegistry, moduleItem);
         hitboxes = new ShipHitboxManager(
-                shipIdKey, bindingRegistry, config.shipHitboxWidth(), config.shipHitboxHeight());
+                shipIdKey, bindingRegistry, shipRegistry,
+                config.shipHitboxWidth(), config.shipHitboxHeight());
         ShipEntityResolver resolver = new ShipEntityResolver(bindingRegistry, hitboxes);
 
         // Load persisted state before listeners attach
@@ -139,8 +140,6 @@ public final class MoreShips extends JavaPlugin {
                     config.movementMaxSpeed(),
                     config.collisionEnabled(),
                     config.collisionMargin(),
-                    config.shipHitboxWidth(),
-                    config.shipHitboxHeight(),
                     config.movementAcceleration(),
                     config.movementFriction(),
                     config.physicsRiseVelocity(),
@@ -164,7 +163,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-14). Collision + ship configuration UI loaded.");
+        getLogger().info("MoreShips enabled (BUILD-15). Ship sizes: Small/Medium/Large.");
     }
 
     @Override

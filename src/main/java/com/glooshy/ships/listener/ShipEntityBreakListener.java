@@ -127,7 +127,7 @@ public final class ShipEntityBreakListener implements Listener {
         }
 
         // Drop inputs BEFORE mutating state
-        stand.getWorld().dropItemNaturally(stand.getLocation(), shipCoreItem.create());
+        stand.getWorld().dropItemNaturally(stand.getLocation(), shipCoreItem.create(ship.size()));
 
         Material hull = ship.hullMaterial();
         if (hull != null) {

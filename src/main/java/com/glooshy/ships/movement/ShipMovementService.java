@@ -63,7 +63,8 @@ public final class ShipMovementService implements Runnable {
     private final ShipHitboxManager hitboxes;
     private final org.bukkit.NamespacedKey shipIdKey;
     private final WaterPhysics waterPhysics;
-    private final CollisionBox collision;
+    private final boolean collisionEnabled;
+    private final double collisionMargin;
     private final double maxSpeed;
     private final double acceleration;
     private final double friction;
@@ -81,8 +82,6 @@ public final class ShipMovementService implements Runnable {
             double maxSpeed,
             boolean collisionEnabled,
             double collisionMargin,
-            double hitboxWidth,
-            double hitboxHeight,
             double acceleration,
             double friction,
             double riseVelocity,
@@ -97,9 +96,8 @@ public final class ShipMovementService implements Runnable {
         this.acceleration = acceleration;
         this.friction = friction;
         this.waterPhysics = new WaterPhysics(riseVelocity, sinkVelocity);
-        this.collision = collisionEnabled
-                ? new CollisionBox(hitboxWidth, hitboxHeight, collisionMargin)
-                : null;
+        this.collisionEnabled = collisionEnabled;
+        this.collisionMargin = collisionMargin;
     }
 
     public synchronized void start() {
@@ -161,12 +159,12 @@ public final class ShipMovementService implements Runnable {
                 }
 
                 movement.tick();
-                applyVelocity(entity, movement.currentSpeed());
+                applyVelocity(entity, ship, movement.currentSpeed());
             } else {
                 // Unfinished / hull-applied ships: no propulsion, but they
                 // still sit in the world — vertical physics applies.
                 movements.remove(shipId);
-                applyVelocity(entity, 0.0);
+                applyVelocity(entity, ship, 0.0);
             }
 
             // Module entities hold their slot positions; hitbox rides along.
@@ -241,16 +239,20 @@ public final class ShipMovementService implements Runnable {
      * into one velocity applied this tick. We own the full velocity vector —
      * vanilla gravity accumulation is overridden every tick.
      */
-    private void applyVelocity(@NotNull Entity shipEntity, double forwardSpeed) {
+    private void applyVelocity(@NotNull Entity shipEntity, Ship ship, double forwardSpeed) {
         Location loc = shipEntity.getLocation();
         double yawRad = Math.toRadians(loc.getYaw());
         double dx = -Math.sin(yawRad) * forwardSpeed;
         double dz = Math.cos(yawRad) * forwardSpeed;
 
+        CollisionBox collision = collisionEnabled
+                ? new CollisionBox(ship.size().hitboxWidth(), 1.8, collisionMargin)
+                : null;
         if (collision != null && (dx != 0.0 || dz != 0.0)) {
-            double[] clamped = collision.clampMovement(
+            CollisionBox box = collision;
+            double[] clamped = box.clampMovement(
                     loc.getX(), loc.getZ(), dx, dz,
-                    (x, z) -> collidesAt(shipEntity, loc.getY(), x, z));
+                    (x, z) -> collidesAt(box, shipEntity, loc.getY(), x, z));
             dx = clamped[0];
             dz = clamped[1];
         }
@@ -267,7 +269,8 @@ public final class ShipMovementService implements Runnable {
      * (x, z), base at y. Water and passable blocks (grass, flowers...) do
      * not collide.
      */
-    private boolean collidesAt(@NotNull Entity shipEntity, double y, double x, double z) {
+    private boolean collidesAt(CollisionBox collision, @NotNull Entity shipEntity,
+                               double y, double x, double z) {
         var world = shipEntity.getWorld();
         int[] xs = collision.blockRangeX(x, 0.0);
         int[] ys = collision.blockRangeY(y);

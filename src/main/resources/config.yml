@@ -3,12 +3,18 @@
 # Edit this file and run /moreships reload (future slice) or restart the server.
 # All values must be present; defaults are listed below.
 
+# Ship cores, one per size (spec §2). The PDC marker identifies a real core
+# item — a vanilla heart-of-the-sea never places a ship.
 shipCore:
-  # Base vanilla material used for the Ship Core item. Players see this texture
-  # until a custom resource pack overrides it.
-  baseMaterial: HEART_OF_THE_SEA
-  # Display name shown when the item is hovered.
-  displayName: "Ship Core"
+  small:
+    material: HEART_OF_THE_SEA
+    displayName: "Small Ship Core"
+  medium:
+    material: NAUTILUS_SHELL
+    displayName: "Medium Ship Core"
+  large:
+    material: DRAGON_EGG
+    displayName: "Large Ship Core"
 
 placement:
   # Offset from the clicked block where the ship entity spawns.
