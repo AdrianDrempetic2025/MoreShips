@@ -293,9 +293,8 @@ public final class CustomModelVisualManager {
         if (trimIndex < tracked.size()) {
             Entity entity = Bukkit.getEntity(tracked.get(trimIndex));
             if (entity instanceof ItemDisplay display && !display.isDead()) {
-                if (display.getLocation().distanceSquared(base) > 0.01) {
-                    display.teleport(base);
-                }
+                display.teleport(base);
+                display.setInterpolationDelay(0);
                 // The ItemDisplay natively anchors the model's [8,8,8]px at the
                 // entity; shifting by (8 - C)/16 puts the model's TRUE center
                 // (same C the hull cubes use) on the controller — both layers
