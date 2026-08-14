@@ -75,13 +75,24 @@ public final class CustomModelVisualManager {
         /** True center of the WHOLE model (bbox of all elements, px) — the
          *  artist's pivot-based ship center. Maps onto the controller. */
         final double[] center;
+        /** Y (px) of the seat element (SeatMAIN) — the controller stand's head
+         *  is aligned to this height, per the artist's layout. */
+        final double seatY;
 
-        ModelSpec(List<HullCube> hullCubes, NamespacedKey trimItemModel, double[] center) {
+        ModelSpec(List<HullCube> hullCubes, NamespacedKey trimItemModel,
+                  double[] center, double seatY) {
             this.hullCubes = List.copyOf(hullCubes);
             this.trimItemModel = trimItemModel;
             this.center = center;
+            this.seatY = seatY;
         }
     }
+
+    /** Armor stand passenger head/eye height — the seat aligns here. */
+    private static final double PILOT_HEAD_HEIGHT = 1.45;
+
+    /** Ship pose at the last model update (anti-shake gate). */
+    private final Map<ShipIdentity, double[]> lastPose = new ConcurrentHashMap<>();
 
     /** Small floating hull-material cubes orbiting the ship (defense symbol). */
     private static final int DEFENSE_BLOCK_COUNT = 3;
@@ -138,11 +149,25 @@ public final class CustomModelVisualManager {
                         axis, angle, rotOrigin));
             }
             models.put(size, new ModelSpec(cubes,
-                    new NamespacedKey("moreships", trimItemModel), bboxCenter(root)));
+                    new NamespacedKey("moreships", trimItemModel), bboxCenter(root),
+                    seatY(root)));
             logger.info("Custom model for " + size + ": " + cubes.size() + " hull cubes");
         } catch (Exception e) {
             logger.warning("Failed to load custom model " + resource + ": " + e.getMessage());
         }
+    }
+
+    /** Center Y (px) of the element named SeatMAIN; fallback 4 (mid-deck). */
+    private static double seatY(JsonObject root) {
+        for (JsonElement el : root.getAsJsonArray("elements")) {
+            JsonObject cube = el.getAsJsonObject();
+            if ("SeatMAIN".equals(cube.get("name") == null ? "" : cube.get("name").getAsString())) {
+                double[] from = px(cube.getAsJsonArray("from"));
+                double[] to = px(cube.getAsJsonArray("to"));
+                return (from[1] + to[1]) / 2.0;
+            }
+        }
+        return 4.0;
     }
 
     /** Bounding-box center of ALL elements in the model (px). */
@@ -250,25 +275,43 @@ public final class CustomModelVisualManager {
     }
 
     private void positionVisuals(Ship ship, ModelSpec spec, Location base, List<UUID> tracked) {
-        float yawRad = (float) Math.toRadians(base.getYaw());
-        Quaternionf shipRot = new Quaternionf().rotationY(-yawRad);
+        // Anti-shake: teleporting + restarting the interpolation window every
+        // tick (even when the ship stands still) reads as constant micro-jitter.
+        // Only touch the model display when the ship's pose actually changed.
+        double[] pose = {base.getX(), base.getY(), base.getZ(), base.getYaw()};
+        double[] last = lastPose.get(ship.identity());
+        boolean poseChanged = last == null
+                || Math.abs(pose[0] - last[0]) > 1e-4
+                || Math.abs(pose[1] - last[1]) > 1e-4
+                || Math.abs(pose[2] - last[2]) > 1e-4
+                || Math.abs(pose[3] - last[3]) > 0.05;
 
-        // Whole model: client renders it anchored at [8,8,8]px; shift so the
-        // model's TRUE bbox center sits on the controller, rotate with the ship
-        double[] c = spec.center;
-        if (!tracked.isEmpty()) {
-            Entity entity = Bukkit.getEntity(tracked.get(0));
-            if (entity instanceof ItemDisplay display && !display.isDead()) {
-                display.teleport(base);
-                display.setInterpolationDelay(0);
-                Vector3f transl = new Vector3f(
-                        (float) ((8.0 - c[0]) / 16.0),
-                        (float) ((8.0 - c[1]) / 16.0),
-                        (float) ((8.0 - c[2]) / 16.0)).rotate(shipRot);
-                Transformation t = new Transformation(
-                        transl, new Quaternionf(shipRot),
-                        new Vector3f(1.0f, 1.0f, 1.0f), new Quaternionf());
-                display.setTransformation(t);
+        // Model north (= its -Z bow) points where the armor stand faces:
+        // an extra 180 deg aligns the baked model's facing with the stand
+        float yawRad = (float) Math.toRadians(base.getYaw());
+        Quaternionf shipRot = new Quaternionf().rotationY(-yawRad + (float) Math.PI);
+
+        if (poseChanged) {
+            lastPose.put(ship.identity(), pose);
+            double[] c = spec.center;
+            if (!tracked.isEmpty()) {
+                Entity entity = Bukkit.getEntity(tracked.get(0));
+                if (entity instanceof ItemDisplay display && !display.isDead()) {
+                    display.teleport(base);
+                    display.setInterpolationDelay(0);
+                    // XZ: model's TRUE bbox center sits on the controller.
+                    // Y: the model's SEAT is lifted to the stand's head height,
+                    // so the rider sits in the seat, per the artist's layout.
+                    float seatLift = (float) (PILOT_HEAD_HEIGHT - (spec.seatY - c[1]) / 16.0);
+                    Vector3f transl = new Vector3f(
+                            (float) ((8.0 - c[0]) / 16.0),
+                            seatLift,
+                            (float) ((8.0 - c[2]) / 16.0)).rotate(shipRot);
+                    Transformation t = new Transformation(
+                            transl, new Quaternionf(shipRot),
+                            new Vector3f(1.0f, 1.0f, 1.0f), new Quaternionf());
+                    display.setTransformation(t);
+                }
             }
         }
 
@@ -310,6 +353,7 @@ public final class CustomModelVisualManager {
 
     /** Remove the custom visuals of a ship. */
     public void despawn(ShipIdentity shipId) {
+        lastPose.remove(shipId);
         List<UUID> tracked = byShip.remove(shipId);
         if (tracked == null) {
             return;
