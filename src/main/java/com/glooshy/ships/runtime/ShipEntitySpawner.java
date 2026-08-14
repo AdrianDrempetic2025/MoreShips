@@ -41,6 +41,7 @@ public final class ShipEntitySpawner {
     public UUID spawnUnfinishedShip(Location location, ShipIdentity shipId) {
         ArmorStand stand = location.getWorld().spawn(location, ArmorStand.class, as -> {
             as.setVisible(false); // the custom model is the visual; helm = leather hat
+            as.setSmall(true); // lowers the passenger seat ~1.5 blocks
             as.setGravity(true);
             as.setCollidable(false); // the solid deck must not push the controller
             as.setGlowing(false);

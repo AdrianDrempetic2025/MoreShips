@@ -11,7 +11,8 @@ import json, os, shutil, sys, zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZES = {
-    "small": ("small_ship_hull.json", "small_ship_metal_coat.png", "ship_small_trim"),
+    # name: (model, texture, item-model, target_w_blocks, target_l_blocks)
+    "small": ("small_ship_hull.json", "small_ship_metal_coat.png", "ship_small_trim", 2, 3),
     # add medium/large here as models arrive
 }
 
@@ -26,7 +27,7 @@ def main():
                         "description": "MoreShips custom hull models"}},
               open(os.path.join(pack, "pack.mcmeta"), "w"))
 
-    for size, (model, texture, item_model) in SIZES.items():
+    for size, (model, texture, item_model, tw, tl) in SIZES.items():
         src = os.path.join(ROOT, "assets", size, model)
         if not os.path.exists(src):
             print(f"skip {size}: {src} missing")
@@ -55,17 +56,19 @@ def main():
             zs += [el["from"][2], el["to"][2]]
         cx, cy, cz = (min(xs)+max(xs))/2, (min(ys)+max(ys))/2, (min(zs)+max(zs))/2
         # WORN-MODEL placement: the ship model is the controller stand's HELMET.
-        # Scale 2 = ship renders at hull size (worn models render at 1:1 px,
-        # which reads half-size in world). Translation maps the model's deck
-        # FLOOR (bbox ymin) onto the stand's HEAD height — the rider sits in
-        # the boat with the floor at seat level, hull hanging down into the
-        # water. Position/rotation come from the stand itself.
+        # Scale fits the model's bbox to the SPEC hull footprint (2x3 blocks
+        # for small) — the binding constraint wins so the hull never exceeds
+        # spec. Translation maps the deck FLOOR (bbox ymin) onto the stand's
+        # head attach, then shifts DOWN one block so the hull rides deeper in
+        # the water. Position/rotation come from the stand itself.
         ymin = min(ys)
-        sc = 2
+        w_px = max(xs) - min(xs)
+        l_px = max(zs) - min(zs)
+        sc = min(tw * 16.0 / w_px, tl * 16.0 / l_px)
         whole["display"] = {"head": {
-            "translation": [round(sc * (8 - cx), 3), round(sc * (8 - ymin), 3), round(sc * (8 - cz), 3)],
+            "translation": [round(sc * (8 - cx), 3), round(sc * (8 - ymin) - 16, 3), round(sc * (8 - cz), 3)],
             "rotation": [0, 0, 0],
-            "scale": [sc, sc, sc],
+            "scale": [round(sc, 4), round(sc, 4), round(sc, 4)],
         }}
         trim = whole
         if not trim["elements"]:

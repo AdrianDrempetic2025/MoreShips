@@ -166,6 +166,9 @@ public final class ShipMovementService implements Runnable {
                 if (stand.isVisible()) {
                     stand.setVisible(false);
                 }
+                if (!stand.isSmall()) {
+                    stand.setSmall(true); // lower passenger seat
+                }
                 if (!com.glooshy.ships.item.ShipModelHelmet.isShipModel(
                         stand.getEquipment().getHelmet(), modelItemKey)) {
                     stand.getEquipment().setHelmet(
@@ -262,6 +265,7 @@ public final class ShipMovementService implements Runnable {
                 : "Unfinished Ship " + shortId;
         org.bukkit.entity.ArmorStand stand = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, as -> {
             as.setVisible(false);
+            as.setSmall(true);
             as.setGravity(true);
             as.setCollidable(false);
             as.setGlowing(false);
