@@ -103,5 +103,6 @@ cannons:
   damage: 6.0
   # Per-cannon reload time in seconds.
   cooldownSeconds: 3.0
-  # Shot speed in blocks per tick.
-  speed: 1.5
+  # Shot speed in blocks per tick. Shots have gravity and a slight
+  # downward arc so they can reach water-level hulls.
+  speed: 2.0

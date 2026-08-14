@@ -63,14 +63,16 @@ public final class CannonService {
         double dirX = -Math.cos(yawRad) * localX - Math.sin(yawRad) * localZ;
         double dirZ = -Math.sin(yawRad) * localX + Math.cos(yawRad) * localZ;
         double len = Math.max(1e-6, Math.sqrt(dirX * dirX + dirZ * dirZ));
-        Vector velocity = new Vector(dirX / len * speed, 0.05, dirZ / len * speed);
+        // Gravity ON + slight downward aim: the shot arcs into the target's
+        // water-level hull instead of flying flat over the half-block hitbox
+        Vector velocity = new Vector(dirX / len * speed, -0.02, dirZ / len * speed);
 
         Location muzzle = cannonLocation.clone().add(
                 velocity.clone().normalize().multiply(0.6)).add(0, 0.4, 0);
         Snowball shot = muzzle.getWorld().spawn(muzzle, Snowball.class, sb -> {
             sb.setVelocity(velocity);
             sb.setShooter(shooter);
-            sb.setGravity(false);
+            sb.setGravity(true);
             sb.setPersistent(false);
             sb.getPersistentDataContainer().set(
                     cannonMarker, PersistentDataType.STRING, ship.identity().encoded());

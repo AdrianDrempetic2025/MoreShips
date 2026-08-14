@@ -156,7 +156,7 @@ public final class MoreShipsConfig {
     }
 
     public double cannonSpeed() {
-        return config.getDouble("cannons.speed", 1.5);
+        return config.getDouble("cannons.speed", 2.0);
     }
 
     public boolean collisionEnabled() {
