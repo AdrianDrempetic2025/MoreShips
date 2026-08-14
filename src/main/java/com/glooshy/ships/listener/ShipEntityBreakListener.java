@@ -1,5 +1,6 @@
 package com.glooshy.ships.listener;
 
+import com.glooshy.ships.cargo.CargoService;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.runtime.RuntimeBinding;
@@ -55,15 +56,18 @@ public final class ShipEntityBreakListener implements Listener {
     private final ShipRegistry shipRegistry;
     private final ShipTeardownService teardownService;
     private final ModuleItem moduleItem;
+    private final CargoService cargoService;
 
     public ShipEntityBreakListener(
             ShipCoreItem shipCoreItem,
             ModuleItem moduleItem,
+            CargoService cargoService,
             RuntimeBindingRegistry bindingRegistry,
             ShipRegistry shipRegistry,
             ShipTeardownService teardownService) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
+        this.cargoService = cargoService;
         this.bindingRegistry = bindingRegistry;
         this.shipRegistry = shipRegistry;
         this.teardownService = teardownService;
@@ -117,6 +121,7 @@ public final class ShipEntityBreakListener implements Listener {
         }
 
         dropModules(stand, ship);
+        dropCargo(stand, ship);
 
         teardownService.teardown(ship.identity());
         stand.remove();
@@ -138,6 +143,7 @@ public final class ShipEntityBreakListener implements Listener {
             Player attacker = damagerAsPlayer(event);
             String id = ship.identity().encoded();
             dropModules(stand, after);
+            dropCargo(stand, after);
             try {
                 shipRegistry.transition(ship.identity(), LifecyclePhase.DESTROYED);
             } catch (IllegalStateException ignored) {
@@ -157,6 +163,19 @@ public final class ShipEntityBreakListener implements Listener {
                 "Ship " + shortId(ship.identity()) + " [" + after.currentHp()
                         + "/" + after.maxHp() + " HP]",
                 NamedTextColor.AQUA));
+    }
+
+    /**
+     * Drop all cargo contents at the entity location (RQCA-22: cargo is 100%
+     * conserved on teardown and destruction).
+     */
+    private void dropCargo(ArmorStand stand, Ship ship) {
+        ship.cargo().values().forEach(itemMap -> {
+            org.bukkit.inventory.ItemStack item = cargoService.deserializeItem(itemMap);
+            if (item != null) {
+                stand.getWorld().dropItemNaturally(stand.getLocation(), item);
+            }
+        });
     }
 
     /**

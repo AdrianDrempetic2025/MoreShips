@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -202,5 +203,78 @@ class YamlShipStoreTest {
                 "Only the valid module entry survives");
         assertEquals(com.glooshy.ships.ship.ModuleType.CARGO,
                 loaded.get(0).modules().get(com.glooshy.ships.ship.ModuleSlot.BOW));
+    }
+
+    /**
+     * FALSIFICATION_PROOF — CARGO_PERSISTENCE_LOSS.
+     *
+     * <p>Mutation plan: drop the cargo entry in {@code save}. Expected RED:
+     * loaded cargo empty.
+     */
+    @Test
+    void save_then_load_preserves_cargo() throws IOException {
+        Path file = tempDir.resolve("ships.yml");
+        YamlShipStore store = new YamlShipStore(file);
+
+        Map<Integer, Map<String, Object>> cargo = Map.of(
+                0, Map.of("type", "STONE", "amount", 3),
+                26, Map.of("type", "DIAMOND", "amount", 1));
+        Ship ship = new Ship(
+                ShipIdentity.fromUuid(UUID.randomUUID()),
+                LifecyclePhase.FINALIZED,
+                null,
+                18,
+                20,
+                java.util.Map.of(com.glooshy.ships.ship.ModuleSlot.BOW, com.glooshy.ships.ship.ModuleType.CARGO),
+                cargo);
+
+        store.save(List.of(ship));
+
+        List<Ship> loaded = store.load();
+
+        assertEquals(1, loaded.size());
+        Ship restored = loaded.get(0);
+        assertEquals(cargo, restored.cargo(),
+                "Cargo contents must survive the save/load round-trip");
+    }
+
+    /**
+     * FALSIFICATION_PROOF — HP_PERSISTENCE_LOSS (known bug fixed in BUILD-09).
+     *
+     * <p>Mutation plan: drop currentHp/maxHp in {@code save}. Expected RED:
+     * restored HP is -1 instead of 7/20.
+     */
+    @Test
+    void save_then_load_preserves_hp() throws IOException {
+        Path file = tempDir.resolve("ships.yml");
+        YamlShipStore store = new YamlShipStore(file);
+
+        Ship ship = new Ship(
+                ShipIdentity.fromUuid(UUID.randomUUID()),
+                LifecyclePhase.FINALIZED,
+                null,
+                7,
+                20);
+
+        store.save(List.of(ship));
+
+        Ship restored = new YamlShipStore(file).load().get(0);
+        assertEquals(7, restored.currentHp(), "currentHp must survive restart");
+        assertEquals(20, restored.maxHp(), "maxHp must survive restart");
+    }
+
+    /** Old saves without hp keys load with the -1 sentinel (backwards compat). */
+    @Test
+    void load_without_hp_keys_defaults_to_sentinel() throws IOException {
+        Path file = tempDir.resolve("ships.yml");
+        Files.writeString(file, """
+                ships:
+                  - identity: "%s"
+                    phase: FINALIZED
+                """.formatted(UUID.randomUUID()));
+
+        Ship restored = new YamlShipStore(file).load().get(0);
+        assertEquals(-1, restored.currentHp());
+        assertEquals(-1, restored.maxHp());
     }
 }

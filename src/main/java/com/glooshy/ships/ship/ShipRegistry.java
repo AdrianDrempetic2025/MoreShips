@@ -62,7 +62,7 @@ public final class ShipRegistry {
             }
             int maxHp = hullMaterial != null ? hpCalculator.computeMaxHp(hullMaterial.getHardness()) : -1;
             return new Ship(key, LifecyclePhase.HULL_APPLIED, hullMaterial, maxHp, maxHp,
-                    current.modules());
+                    current.modules(), current.cargo());
         });
     }
 
@@ -87,7 +87,7 @@ public final class ShipRegistry {
             }
             int newHp = Math.max(0, current.currentHp() - (int) Math.round(amount));
             return new Ship(key, current.phase(), current.hullMaterial(), newHp, current.maxHp(),
-                    current.modules());
+                    current.modules(), current.cargo());
         });
     }
 
@@ -119,7 +119,7 @@ public final class ShipRegistry {
             modules.putAll(current.modules());
             modules.put(slot, type);
             return new Ship(key, current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), Map.copyOf(modules));
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules), current.cargo());
         });
     }
 
@@ -149,7 +149,7 @@ public final class ShipRegistry {
             modules.putAll(current.modules());
             modules.remove(slot);
             return new Ship(key, current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), Map.copyOf(modules));
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules), current.cargo());
         });
     }
 
@@ -185,7 +185,7 @@ public final class ShipRegistry {
             modules.putAll(current.modules());
             modules.put(to, modules.remove(from));
             return new Ship(key, current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), Map.copyOf(modules));
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules), current.cargo());
         });
     }
 
@@ -205,7 +205,26 @@ public final class ShipRegistry {
                 return null;
             }
             return new Ship(key, newPhase, current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), current.modules());
+                    current.currentHp(), current.maxHp(), current.modules(), current.cargo());
+        });
+    }
+
+    /**
+     * Replace the full cargo contents of a live ship (RQCA-21/22). Bulk
+     * setter — the caller serializes the whole inventory and hands it over.
+     *
+     * @throws IllegalStateException if the ship is not found
+     */
+    public Ship setCargo(ShipIdentity identity, Map<Integer, Map<String, Object>> cargo) {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(cargo, "cargo");
+        return ships.compute(identity, (key, current) -> {
+            if (current == null) {
+                throw new IllegalStateException("Ship not found: " + identity);
+            }
+            return new Ship(key, current.phase(), current.hullMaterial(),
+                    current.currentHp(), current.maxHp(), current.modules(),
+                    Map.copyOf(cargo));
         });
     }
 

@@ -1,5 +1,6 @@
 package com.glooshy.ships;
 
+import com.glooshy.ships.cargo.CargoService;
 import com.glooshy.ships.command.ShipsCommand;
 import com.glooshy.ships.config.MoreShipsConfig;
 import com.glooshy.ships.hull.HpCalculator;
@@ -7,6 +8,7 @@ import com.glooshy.ships.hull.HullValidator;
 import com.glooshy.ships.identity.ShipIdentityGenerator;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
+import com.glooshy.ships.listener.CargoInventoryListener;
 import com.glooshy.ships.listener.HullApplicationListener;
 import com.glooshy.ships.listener.ModuleInstallListener;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
@@ -68,6 +70,7 @@ public final class MoreShips extends JavaPlugin {
         bindingRegistry = new RuntimeBindingRegistry();
         ShipTeardownService teardownService = new ShipTeardownService(shipRegistry, bindingRegistry);
         HullValidator hullValidator = new HullValidator(config.hullMinHardness());
+        CargoService cargoService = new CargoService(shipRegistry);
 
         // Load persisted state before listeners attach
         loadPersistedState();
@@ -86,7 +89,7 @@ public final class MoreShips extends JavaPlugin {
         getServer().getPluginManager().registerEvents(placementListener, this);
 
         ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
-                shipCoreItem, moduleItem, bindingRegistry, shipRegistry, teardownService);
+                shipCoreItem, moduleItem, cargoService, bindingRegistry, shipRegistry, teardownService);
         getServer().getPluginManager().registerEvents(breakListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
@@ -96,6 +99,9 @@ public final class MoreShips extends JavaPlugin {
         ModuleInstallListener moduleListener = new ModuleInstallListener(
                 shipRegistry, bindingRegistry, moduleItem);
         getServer().getPluginManager().registerEvents(moduleListener, this);
+
+        getServer().getPluginManager().registerEvents(
+                new CargoInventoryListener(cargoService), this);
 
         if (config.movementEnabled()) {
             getServer().getPluginManager().registerEvents(
@@ -116,7 +122,8 @@ public final class MoreShips extends JavaPlugin {
         }
 
         ShipsCommand shipsCommand = new ShipsCommand(
-                shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener);
+                shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener,
+                cargoService);
         PluginCommand command = getCommand("moreships");
         if (command != null) {
             command.setExecutor(shipsCommand);
@@ -125,7 +132,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-08). Persistence + movement + modules loaded.");
+        getLogger().info("MoreShips enabled (BUILD-09). Persistence + movement + modules + cargo loaded.");
     }
 
     @Override

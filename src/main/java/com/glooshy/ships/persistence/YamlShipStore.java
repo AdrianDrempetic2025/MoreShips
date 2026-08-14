@@ -77,10 +77,24 @@ public final class YamlShipStore implements ShipStore {
             if (ship.hullMaterial() != null) {
                 entry.put("hullMaterial", ship.hullMaterial().name());
             }
+            if (ship.currentHp() != -1 || ship.maxHp() != -1) {
+                entry.put("currentHp", ship.currentHp());
+                entry.put("maxHp", ship.maxHp());
+            }
             if (!ship.modules().isEmpty()) {
                 Map<String, String> modules = new LinkedHashMap<>();
                 ship.modules().forEach((slot, type) -> modules.put(slot.name(), type.name()));
                 entry.put("modules", modules);
+            }
+            if (!ship.cargo().isEmpty()) {
+                List<Map<String, Object>> cargo = new ArrayList<>(ship.cargo().size());
+                ship.cargo().forEach((slot, item) -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("slot", slot);
+                    row.put("item", item);
+                    cargo.add(row);
+                });
+                entry.put("cargo", cargo);
             }
             data.add(entry);
         }
@@ -116,6 +130,9 @@ public final class YamlShipStore implements ShipStore {
         Object hullRaw = map.get("hullMaterial");
         Material hull = (hullRaw instanceof String hullName) ? Material.matchMaterial(hullName) : null;
 
+        int currentHp = map.get("currentHp") instanceof Number n ? n.intValue() : -1;
+        int maxHp = map.get("maxHp") instanceof Number n2 ? n2.intValue() : -1;
+
         Map<ModuleSlot, ModuleType> modules = new LinkedHashMap<>();
         Object modulesRaw = map.get("modules");
         Map<String, Object> modulesMap = modulesRaw instanceof MemorySection section
@@ -130,7 +147,26 @@ public final class YamlShipStore implements ShipStore {
                 }
             }
         }
-        return new Ship(identity, phase, hull, -1, -1, Map.copyOf(modules));
+        Map<Integer, Map<String, Object>> cargo = new LinkedHashMap<>();
+        Object cargoRaw = map.get("cargo");
+        if (cargoRaw instanceof List<?> rows) {
+            for (Object row : rows) {
+                Map<String, Object> rowMap = row instanceof MemorySection section
+                        ? section.getValues(false)
+                        : (row instanceof Map<?, ?> raw ? asStringMap(raw) : null);
+                if (rowMap == null) {
+                    continue;
+                }
+                if (!(rowMap.get("slot") instanceof Number slot)
+                        || !(rowMap.get("item") instanceof Map<?, ?>)) {
+                    continue;
+                }
+                cargo.put(slot.intValue(), asStringMap((Map<?, ?>) rowMap.get("item")));
+            }
+        }
+
+        return new Ship(identity, phase, hull, currentHp, maxHp,
+                Map.copyOf(modules), Map.copyOf(cargo));
     }
 
     private static Map<String, Object> asStringMap(Map<?, ?> raw) {

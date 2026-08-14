@@ -1,5 +1,6 @@
 package com.glooshy.ships.command;
 
+import com.glooshy.ships.cargo.CargoService;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
@@ -35,7 +36,7 @@ import org.jetbrains.annotations.Nullable;
 public final class ShipsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("give", "info", "finalize", "module", "debug", "help");
+            List.of("give", "info", "finalize", "module", "cargo", "debug", "help");
 
     private static final List<String> MODULE_SUBCOMMANDS = List.of("list", "remove", "move");
 
@@ -46,17 +47,20 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
     private final ShipRegistry shipRegistry;
     private final RuntimeBindingRegistry bindingRegistry;
     private final ShipCorePlacementListener placementListener;
+    private final CargoService cargoService;
 
     public ShipsCommand(ShipCoreItem shipCoreItem,
                         ModuleItem moduleItem,
                         ShipRegistry shipRegistry,
                         RuntimeBindingRegistry bindingRegistry,
-                        ShipCorePlacementListener placementListener) {
+                        ShipCorePlacementListener placementListener,
+                        CargoService cargoService) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
         this.placementListener = placementListener;
+        this.cargoService = cargoService;
     }
 
     @Override
@@ -71,6 +75,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             case "info" -> handleInfo(sender);
             case "finalize" -> handleFinalize(sender);
             case "module" -> handleModule(sender, args);
+            case "cargo" -> handleCargo(sender);
             case "debug" -> handleDebug(sender);
             case "help" -> sendHelp(sender);
             default -> sender.sendMessage(Component.text(
@@ -363,6 +368,38 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                 NamedTextColor.GRAY));
     }
 
+    private void handleCargo(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can open cargo.", NamedTextColor.RED));
+            return;
+        }
+
+        Entity target = player.getTargetEntity(TARGET_RAYTRACE_DISTANCE);
+        Optional<RuntimeBinding> binding = target == null
+                ? Optional.empty()
+                : bindingRegistry.findByEntity(target.getUniqueId());
+        if (binding.isEmpty()) {
+            player.sendMessage(Component.text(
+                    "Look at a ship within " + TARGET_RAYTRACE_DISTANCE
+                            + " blocks first.", NamedTextColor.RED));
+            return;
+        }
+        Optional<Ship> shipOpt = shipRegistry.find(binding.get().shipId());
+        if (shipOpt.isEmpty()) {
+            player.sendMessage(Component.text(
+                    "Ship no longer exists in registry.", NamedTextColor.RED));
+            return;
+        }
+        Ship ship = shipOpt.get();
+        if (ship.phase() != LifecyclePhase.HULL_APPLIED && ship.phase() != LifecyclePhase.FINALIZED) {
+            player.sendMessage(Component.text(
+                    "Cargo is available on hull-applied and finalized ships only.",
+                    NamedTextColor.RED));
+            return;
+        }
+        cargoService.open(player, ship);
+    }
+
     private static String shortId(com.glooshy.ships.identity.ShipIdentity id) {
         String encoded = id.encoded();
         int dash = encoded.indexOf('-');
@@ -382,6 +419,8 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" — remove a module (bow/stern/port/starboard), drops the item", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships module move <from> <to>", NamedTextColor.AQUA)
                 .append(Component.text(" — move a module to another slot", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/moreships cargo", NamedTextColor.AQUA)
+                .append(Component.text(" — open the cargo hold of the ship you are looking at (needs a Cargo Module)", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships debug", NamedTextColor.AQUA)
                 .append(Component.text(" — show last interact + main hand state", NamedTextColor.GRAY)));
     }
