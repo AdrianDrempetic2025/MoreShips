@@ -221,7 +221,7 @@ public final class CustomModelVisualManager {
             return e == null || e.isDead();
         });
 
-        int expected = 1 + DEFENSE_BLOCK_COUNT; // whole-model display + defense blocks
+        int expected = DEFENSE_BLOCK_COUNT; // defense blocks only - the model is the stand's helmet
         if (tracked.size() != expected) {
             for (UUID uuid : tracked) {
                 Entity e = Bukkit.getEntity(uuid);
@@ -237,28 +237,10 @@ public final class CustomModelVisualManager {
     }
 
     private List<UUID> spawnVisuals(ShipIdentity shipId, Ship ship, ModelSpec spec, Location base) {
+        // The ship model itself is the controller stand's HELMET (worn item
+        // model) - position and rotation come from the stand natively. Only
+        // the defense blocks (hull-material symbol) live here.
         List<UUID> entities = new ArrayList<>();
-
-        // ONE ItemDisplay renders the whole baked model — the client composes
-        // every cube into a single rigid object. Hull material no longer
-        // retextures the hull; it is shown by the orbiting defense blocks.
-        ItemDisplay model = base.getWorld().spawn(base, ItemDisplay.class, id -> {
-            id.setTeleportDuration(1);
-            id.setInterpolationDuration(1);
-            id.setInterpolationDelay(0);
-            ItemStack stack = new ItemStack(Material.PAPER);
-            ItemMeta meta = stack.getItemMeta();
-            meta.setItemModel(spec.trimItemModel);
-            stack.setItemMeta(meta);
-            id.setItemStack(stack);
-            id.setPersistent(false);
-            id.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
-            id.setViewRange(1.0f);
-        });
-        entities.add(model.getUniqueId());
-
-        // Defense blocks: small floating cubes of the LIVE hull material,
-        // orbiting the ship — the material the player applied is always visible
         for (int i = 0; i < DEFENSE_BLOCK_COUNT; i++) {
             BlockDisplay block = base.getWorld().spawn(base, BlockDisplay.class, bd -> {
                 bd.setBlock(ship.hullMaterial().createBlockData());
@@ -269,57 +251,16 @@ public final class CustomModelVisualManager {
             });
             entities.add(block.getUniqueId());
         }
-
         positionVisuals(ship, spec, base, entities);
         return entities;
     }
 
     private void positionVisuals(Ship ship, ModelSpec spec, Location base, List<UUID> tracked) {
-        // Anti-shake: teleporting + restarting the interpolation window every
-        // tick (even when the ship stands still) reads as constant micro-jitter.
-        // Only touch the model display when the ship's pose actually changed.
-        double[] pose = {base.getX(), base.getY(), base.getZ(), base.getYaw()};
-        double[] last = lastPose.get(ship.identity());
-        boolean poseChanged = last == null
-                || Math.abs(pose[0] - last[0]) > 1e-4
-                || Math.abs(pose[1] - last[1]) > 1e-4
-                || Math.abs(pose[2] - last[2]) > 1e-4
-                || Math.abs(pose[3] - last[3]) > 0.05;
-
-        // Model north (= its -Z bow) points where the armor stand faces:
-        // an extra 180 deg aligns the baked model's facing with the stand
-        float yawRad = (float) Math.toRadians(base.getYaw());
-        Quaternionf shipRot = new Quaternionf().rotationY(-yawRad + (float) Math.PI);
-
-        if (poseChanged) {
-            lastPose.put(ship.identity(), pose);
-            double[] c = spec.center;
-            if (!tracked.isEmpty()) {
-                Entity entity = Bukkit.getEntity(tracked.get(0));
-                if (entity instanceof ItemDisplay display && !display.isDead()) {
-                    display.teleport(base);
-                    display.setInterpolationDelay(0);
-                    // XZ: model's TRUE bbox center sits on the controller.
-                    // Y: the model's SEAT is lifted to the stand's head height,
-                    // so the rider sits in the seat, per the artist's layout.
-                    float seatLift = (float) (PILOT_HEAD_HEIGHT - (spec.seatY - c[1]) / 16.0);
-                    Vector3f transl = new Vector3f(
-                            (float) ((8.0 - c[0]) / 16.0),
-                            seatLift,
-                            (float) ((8.0 - c[2]) / 16.0)).rotate(shipRot);
-                    Transformation t = new Transformation(
-                            transl, new Quaternionf(shipRot),
-                            new Vector3f(1.0f, 1.0f, 1.0f), new Quaternionf());
-                    display.setTransformation(t);
-                }
-            }
-        }
-
         // Defense blocks orbit the ship center, evenly spaced, slow rotation
         long now = System.currentTimeMillis();
         double orbitAngle = (now % 6000L) / 6000.0 * 2.0 * Math.PI;
-        for (int i = 0; i < DEFENSE_BLOCK_COUNT && 1 + i < tracked.size(); i++) {
-            Entity entity = Bukkit.getEntity(tracked.get(1 + i));
+        for (int i = 0; i < DEFENSE_BLOCK_COUNT && i < tracked.size(); i++) {
+            Entity entity = Bukkit.getEntity(tracked.get(i));
             if (!(entity instanceof BlockDisplay display) || display.isDead()) {
                 continue;
             }
@@ -330,8 +271,7 @@ public final class CustomModelVisualManager {
             double[] world = worldOffset(base.getYaw(), localX, localZ);
             Location target = base.clone().add(world[0], DEFENSE_BLOCK_HEIGHT, world[1]);
             display.teleport(target);
-            Quaternionf spin = new Quaternionf()
-                    .rotationY((float) (-angle - yawRad));
+            Quaternionf spin = new Quaternionf().rotationY((float) -angle);
             Vector3f centering = new Vector3f(
                     -DEFENSE_BLOCK_SIZE / 2.0f, -DEFENSE_BLOCK_SIZE / 2.0f,
                     -DEFENSE_BLOCK_SIZE / 2.0f).rotate(spin);

@@ -82,7 +82,8 @@ public final class MoreShips extends JavaPlugin {
                 config.moduleMaterials(),
                 config.moduleDisplayNames());
         shipRegistry = new ShipRegistry(ShipIdentityGenerator.uuid(), new HpCalculator(config.hpMultiplier()));
-        ShipEntitySpawner entitySpawner = new ShipEntitySpawner(shipIdKey);
+        org.bukkit.NamespacedKey modelItemKey = new org.bukkit.NamespacedKey("moreships", "ship_small_trim");
+        ShipEntitySpawner entitySpawner = new ShipEntitySpawner(shipIdKey, modelItemKey);
         bindingRegistry = new RuntimeBindingRegistry();
         ShipTeardownService teardownService = new ShipTeardownService(shipRegistry, bindingRegistry);
         HullValidator hullValidator = new HullValidator(config.hullMinHardness());
@@ -151,6 +152,7 @@ public final class MoreShips extends JavaPlugin {
                     moduleEntities,
                     hitboxes,
                     modelVisuals,
+                    modelItemKey,
                     shipIdKey,
                     config.movementMaxSpeed(),
                     config.collisionEnabled(),
@@ -179,7 +181,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-19). Custom Blockbench models (small) loaded.");
+        getLogger().info("MoreShips enabled (BUILD-28). Ship model worn as helmet - native follow.");
     }
 
     @Override

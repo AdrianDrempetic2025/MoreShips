@@ -44,11 +44,26 @@ def main():
             "textures": {"0": tex_ref, "particle": tex_ref},
             "elements": [],
         }
+        xs, ys, zs = [], [], []
         for el in m["elements"]:
             for face in el.get("faces", {}).values():
                 if face.get("texture") in (None, "#missing"):
                     face["texture"] = "#0"
             whole["elements"].append(el)
+            xs += [el["from"][0], el["to"][0]]
+            ys += [el["from"][1], el["to"][1]]
+            zs += [el["from"][2], el["to"][2]]
+        cx, cy, cz = (min(xs)+max(xs))/2, (min(ys)+max(ys))/2, (min(zs)+max(zs))/2
+        # WORN-MODEL placement: the ship model is the controller stand's HELMET.
+        # A worn model's [8,8,8]px sits at the head attach point (~27px above
+        # the feet); translate so the model's bbox center lands at the stand's
+        # feet = water surface. Position/rotation then come from the stand
+        # itself — no teleports, no interpolation, no shake.
+        whole["display"] = {"head": {
+            "translation": [round(8 - cx, 3), round(8 - cy - 27.2, 3), round(8 - cz, 3)],
+            "rotation": [0, 0, 0],
+            "scale": [1, 1, 1],
+        }}
         trim = whole
         if not trim["elements"]:
             print(f"skip {size}: no textured cubes")

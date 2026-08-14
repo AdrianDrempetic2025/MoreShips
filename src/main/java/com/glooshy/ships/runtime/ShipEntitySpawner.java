@@ -31,8 +31,11 @@ public final class ShipEntitySpawner {
 
     private final NamespacedKey shipIdKey;
 
-    public ShipEntitySpawner(NamespacedKey shipIdKey) {
+    private final org.bukkit.NamespacedKey shipModelItem;
+
+    public ShipEntitySpawner(NamespacedKey shipIdKey, org.bukkit.NamespacedKey shipModelItem) {
         this.shipIdKey = shipIdKey;
+        this.shipModelItem = shipModelItem;
     }
 
     public UUID spawnUnfinishedShip(Location location, ShipIdentity shipId) {
@@ -41,7 +44,7 @@ public final class ShipEntitySpawner {
             as.setGravity(true);
             as.setCollidable(false); // the solid deck must not push the controller
             as.setGlowing(false);
-            as.getEquipment().setHelmet(new ItemStack(Material.LEATHER_HELMET));
+            as.getEquipment().setHelmet(com.glooshy.ships.item.ShipModelHelmet.create(shipModelItem));
             as.customName(Component.text(
                     ENTITY_LABEL + " " + shortId(shipId), NamedTextColor.AQUA));
             as.setCustomNameVisible(true);

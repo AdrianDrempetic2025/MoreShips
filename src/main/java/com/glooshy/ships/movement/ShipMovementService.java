@@ -63,6 +63,7 @@ public final class ShipMovementService implements Runnable {
     private final ModuleEntityManager moduleEntities;
     private final ShipHitboxManager hitboxes;
     private final CustomModelVisualManager modelVisuals;
+    private final org.bukkit.NamespacedKey modelItemKey;
     private final org.bukkit.NamespacedKey shipIdKey;
     private final WaterPhysics waterPhysics;
     private final boolean collisionEnabled;
@@ -83,6 +84,7 @@ public final class ShipMovementService implements Runnable {
             @NotNull ModuleEntityManager moduleEntities,
             @NotNull ShipHitboxManager hitboxes,
             @NotNull CustomModelVisualManager modelVisuals,
+            @NotNull org.bukkit.NamespacedKey modelItemKey,
             @NotNull org.bukkit.NamespacedKey shipIdKey,
             double maxSpeed,
             boolean collisionEnabled,
@@ -98,6 +100,7 @@ public final class ShipMovementService implements Runnable {
         this.moduleEntities = moduleEntities;
         this.hitboxes = hitboxes;
         this.modelVisuals = modelVisuals;
+        this.modelItemKey = modelItemKey;
         this.shipIdKey = shipIdKey;
         this.maxSpeed = maxSpeed;
         this.acceleration = acceleration;
@@ -163,10 +166,10 @@ public final class ShipMovementService implements Runnable {
                 if (stand.isVisible()) {
                     stand.setVisible(false);
                 }
-                if (stand.getEquipment().getHelmet() == null
-                        || stand.getEquipment().getHelmet().getType() != org.bukkit.Material.LEATHER_HELMET) {
+                if (!com.glooshy.ships.item.ShipModelHelmet.isShipModel(
+                        stand.getEquipment().getHelmet(), modelItemKey)) {
                     stand.getEquipment().setHelmet(
-                            new org.bukkit.inventory.ItemStack(org.bukkit.Material.LEATHER_HELMET));
+                            com.glooshy.ships.item.ShipModelHelmet.create(modelItemKey));
                 }
             }
 
@@ -262,7 +265,8 @@ public final class ShipMovementService implements Runnable {
             as.setGravity(true);
             as.setCollidable(false);
             as.setGlowing(false);
-            as.getEquipment().setHelmet(new org.bukkit.inventory.ItemStack(org.bukkit.Material.LEATHER_HELMET));
+            as.getEquipment().setHelmet(
+                    com.glooshy.ships.item.ShipModelHelmet.create(modelItemKey));
             as.setCustomNameVisible(true);
             as.customName(net.kyori.adventure.text.Component.text(
                     label, net.kyori.adventure.text.format.NamedTextColor.AQUA));
