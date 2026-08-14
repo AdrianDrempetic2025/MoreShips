@@ -170,7 +170,7 @@ public final class MoreShips extends JavaPlugin {
 
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener,
-                cargoService, moduleEntities, resolver);
+                cargoService, moduleEntities, resolver, modelVisuals);
         PluginCommand command = getCommand("moreships");
         if (command != null) {
             command.setExecutor(shipsCommand);

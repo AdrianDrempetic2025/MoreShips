@@ -33,6 +33,9 @@ def main():
             continue
         m = json.load(open(src, encoding="utf-8"))
         tex_ref = f"moreships:item/{os.path.splitext(texture)[0]}"
+        # NOTE: the artist's Blockbench "display" settings (GUI/hand/head
+        # transforms, often scale 0.1-0.5) must NOT ship — an ItemDisplay would
+        # render the model at that tiny scale. Display entities render raw.
         trim = {
             "credit": m.get("credit", ""),
             "texture_size": [64, 64],
@@ -40,7 +43,6 @@ def main():
             "elements": [el for el in m["elements"]
                          if any(f.get("texture") not in (None, "#missing")
                                 for f in el.get("faces", {}).values())],
-            "display": m.get("display", {}),
         }
         if not trim["elements"]:
             print(f"skip {size}: no textured cubes")

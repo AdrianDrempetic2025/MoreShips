@@ -5,6 +5,7 @@ import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
 import com.glooshy.ships.runtime.ModuleEntityManager;
+import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
@@ -54,6 +55,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
     private final CargoService cargoService;
     private final ModuleEntityManager moduleEntities;
     private final ShipEntityResolver resolver;
+    private final CustomModelVisualManager modelVisuals;
 
     public ShipsCommand(ShipCoreItem shipCoreItem,
                         ModuleItem moduleItem,
@@ -62,7 +64,8 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                         ShipCorePlacementListener placementListener,
                         CargoService cargoService,
                         ModuleEntityManager moduleEntities,
-                        ShipEntityResolver resolver) {
+                        ShipEntityResolver resolver,
+                        CustomModelVisualManager modelVisuals) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.shipRegistry = shipRegistry;
@@ -71,6 +74,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         this.cargoService = cargoService;
         this.moduleEntities = moduleEntities;
         this.resolver = resolver;
+        this.modelVisuals = modelVisuals;
     }
 
     @Override
@@ -403,6 +407,16 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text(
                 "If last interact still shows nothing after a right-click, the event did not reach the plugin.",
                 NamedTextColor.GRAY));
+
+        if (sender instanceof Player dbgPlayer) {
+            Entity dbgTarget = dbgPlayer.getTargetEntity(TARGET_RAYTRACE_DISTANCE);
+            if (dbgTarget != null) {
+                resolver.shipIdOf(dbgTarget).ifPresent(sid ->
+                        sender.sendMessage(Component.text("Visuals: ", NamedTextColor.AQUA)
+                                .append(Component.text(modelVisuals.debugLine(sid),
+                                        NamedTextColor.YELLOW))));
+            }
+        }
     }
 
     private void handleCargo(CommandSender sender) {

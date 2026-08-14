@@ -188,7 +188,8 @@ public final class CustomModelVisualManager {
             id.setItemStack(stack);
             id.setPersistent(false);
             id.setTeleportDuration(1);
-            id.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
+            id.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            id.setViewRange(1.0f);
         });
         entities.add(trim.getUniqueId());
 
@@ -281,5 +282,16 @@ public final class CustomModelVisualManager {
 
     public void clear() {
         byShip.keySet().forEach(this::despawn);
+    }
+
+    /** Player-facing debug line for /moreships debug. */
+    public String debugLine(ShipIdentity shipId) {
+        List<UUID> tracked = byShip.get(shipId);
+        int alive = tracked == null ? 0 : (int) tracked.stream()
+                .map(Bukkit::getEntity)
+                .filter(e -> e != null && !e.isDead())
+                .count();
+        return "customModel specs=" + models.keySet()
+                + " visuals=" + (tracked == null ? "none" : alive + "/" + tracked.size());
     }
 }
