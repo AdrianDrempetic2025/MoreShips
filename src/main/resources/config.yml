@@ -63,3 +63,16 @@ modules:
   cannon:
     material: DISPENSER
     displayName: "Cannon Module"
+
+ship:
+  # Physical hitbox (Interaction entity) size around the ship controller,
+  # in blocks. This is what you actually click/punch/aim at.
+  hitboxWidth: 3.0
+  hitboxHeight: 1.8
+
+physics:
+  # Vertical water physics (blocks per tick).
+  # riseVelocity: upward speed while fully submerged (buoyancy)
+  riseVelocity: 0.35
+  # sinkVelocity: downward speed while out of water (falls like a hull should)
+  sinkVelocity: 0.30

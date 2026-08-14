@@ -87,6 +87,22 @@ public final class MoreShipsConfig {
         return config.getDouble("movement.friction", 0.05);
     }
 
+    public double shipHitboxWidth() {
+        return config.getDouble("ship.hitboxWidth", 3.0);
+    }
+
+    public double shipHitboxHeight() {
+        return config.getDouble("ship.hitboxHeight", 1.8);
+    }
+
+    public double physicsRiseVelocity() {
+        return config.getDouble("physics.riseVelocity", 0.35);
+    }
+
+    public double physicsSinkVelocity() {
+        return config.getDouble("physics.sinkVelocity", 0.30);
+    }
+
     private static final Map<ModuleType, Material> DEFAULT_MODULE_MATERIALS = Map.of(
             ModuleType.SEAT, Material.OAK_STAIRS,
             ModuleType.CARGO, Material.CHEST,

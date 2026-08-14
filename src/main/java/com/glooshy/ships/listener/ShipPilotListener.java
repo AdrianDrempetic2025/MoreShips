@@ -1,7 +1,7 @@
 package com.glooshy.ships.listener;
 
-import com.glooshy.ships.runtime.RuntimeBinding;
-import com.glooshy.ships.runtime.RuntimeBindingRegistry;
+import com.glooshy.ships.identity.ShipIdentity;
+import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.ship.LifecyclePhase;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
@@ -30,25 +30,27 @@ import org.jetbrains.annotations.NotNull;
 public final class ShipPilotListener implements Listener {
 
     private final ShipRegistry shipRegistry;
-    private final RuntimeBindingRegistry bindingRegistry;
+    private final ShipEntityResolver resolver;
 
-    public ShipPilotListener(ShipRegistry shipRegistry, RuntimeBindingRegistry bindingRegistry) {
+    public ShipPilotListener(ShipRegistry shipRegistry, ShipEntityResolver resolver) {
         this.shipRegistry = shipRegistry;
-        this.bindingRegistry = bindingRegistry;
+        this.resolver = resolver;
     }
 
     @EventHandler
     public void onPlayerInteractEntity(@NotNull PlayerInteractEntityEvent event) {
-        if (!(event.getRightClicked() instanceof ArmorStand stand)) {
+        var clicked = event.getRightClicked();
+        Optional<ShipIdentity> shipId = resolver.shipIdOf(clicked);
+        if (shipId.isEmpty()) {
             return;
         }
-
-        Optional<RuntimeBinding> binding = bindingRegistry.findByEntity(stand.getUniqueId());
-        if (binding.isEmpty()) {
+        Optional<ArmorStand> standOpt = resolver.shipStandOf(clicked);
+        if (standOpt.isEmpty()) {
             return;
         }
+        ArmorStand stand = standOpt.get();
 
-        Optional<Ship> shipOpt = shipRegistry.find(binding.get().shipId());
+        Optional<Ship> shipOpt = shipRegistry.find(shipId.get());
         if (shipOpt.isEmpty()) {
             return;
         }

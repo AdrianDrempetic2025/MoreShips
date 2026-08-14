@@ -2,8 +2,7 @@ package com.glooshy.ships.listener;
 
 import com.glooshy.ships.hull.HullValidationResult;
 import com.glooshy.ships.hull.HullValidator;
-import com.glooshy.ships.runtime.RuntimeBinding;
-import com.glooshy.ships.runtime.RuntimeBindingRegistry;
+import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
 import java.util.Optional;
@@ -32,34 +31,36 @@ import org.jetbrains.annotations.NotNull;
 public final class HullApplicationListener implements Listener {
 
     private final ShipRegistry shipRegistry;
-    private final RuntimeBindingRegistry bindingRegistry;
+    private final ShipEntityResolver resolver;
     private final HullValidator hullValidator;
 
     public HullApplicationListener(
             ShipRegistry shipRegistry,
-            RuntimeBindingRegistry bindingRegistry,
+            ShipEntityResolver resolver,
             HullValidator hullValidator) {
         this.shipRegistry = shipRegistry;
-        this.bindingRegistry = bindingRegistry;
+        this.resolver = resolver;
         this.hullValidator = hullValidator;
     }
 
     @EventHandler
     public void onPlayerInteractEntity(@NotNull PlayerInteractEntityEvent event) {
-        if (!(event.getRightClicked() instanceof ArmorStand stand)) {
-            return;
-        }
-
-        Optional<RuntimeBinding> binding = bindingRegistry.findByEntity(stand.getUniqueId());
-        if (binding.isEmpty()) {
+        var clicked = event.getRightClicked();
+        Optional<com.glooshy.ships.identity.ShipIdentity> shipIdOpt = resolver.shipIdOf(clicked);
+        if (shipIdOpt.isEmpty()) {
             return; // Not a custom ship — vanilla armor stand behavior
         }
+        Optional<ArmorStand> standOpt = resolver.shipStandOf(clicked);
+        if (standOpt.isEmpty()) {
+            return;
+        }
+        ArmorStand stand = standOpt.get();
 
         // Custom ship entity — cancel vanilla armor stand GUI/equip behavior
         event.setCancelled(true);
 
         Player player = event.getPlayer();
-        var shipId = binding.get().shipId();
+        var shipId = shipIdOpt.get();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {
             return;

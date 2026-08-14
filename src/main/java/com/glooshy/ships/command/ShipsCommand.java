@@ -5,6 +5,7 @@ import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.ShipCorePlacementListener;
 import com.glooshy.ships.runtime.ModuleEntityManager;
+import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.ship.LifecyclePhase;
@@ -51,6 +52,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
     private final ShipCorePlacementListener placementListener;
     private final CargoService cargoService;
     private final ModuleEntityManager moduleEntities;
+    private final ShipEntityResolver resolver;
 
     public ShipsCommand(ShipCoreItem shipCoreItem,
                         ModuleItem moduleItem,
@@ -58,7 +60,8 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                         RuntimeBindingRegistry bindingRegistry,
                         ShipCorePlacementListener placementListener,
                         CargoService cargoService,
-                        ModuleEntityManager moduleEntities) {
+                        ModuleEntityManager moduleEntities,
+                        ShipEntityResolver resolver) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.shipRegistry = shipRegistry;
@@ -66,6 +69,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         this.placementListener = placementListener;
         this.cargoService = cargoService;
         this.moduleEntities = moduleEntities;
+        this.resolver = resolver;
     }
 
     @Override
@@ -174,16 +178,16 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         }
 
         Entity target = player.getTargetEntity(TARGET_RAYTRACE_DISTANCE);
-        Optional<RuntimeBinding> binding = target == null
+        Optional<com.glooshy.ships.identity.ShipIdentity> shipIdOpt = target == null
                 ? Optional.empty()
-                : bindingRegistry.findByEntity(target.getUniqueId());
-        if (binding.isEmpty()) {
+                : resolver.shipIdOf(target);
+        if (shipIdOpt.isEmpty()) {
             player.sendMessage(Component.text(
                     "Look at a ship within " + TARGET_RAYTRACE_DISTANCE
                             + " blocks first.", NamedTextColor.RED));
             return;
         }
-        var shipId = binding.get().shipId();
+        var shipId = shipIdOpt.get();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {
             player.sendMessage(Component.text(
@@ -224,20 +228,20 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                 }
                 // RQCA-22: a removed cargo module drops its hold contents
                 Map<Integer, Map<String, Object>> hold = ship.cargo().get(slot);
-                if (hold != null && target instanceof ArmorStand stand) {
-                    hold.values().forEach(itemMap -> {
+                Optional<ArmorStand> standOpt = resolver.shipStandOf(target);
+                if (hold != null) {
+                    standOpt.ifPresent(stand -> hold.values().forEach(itemMap -> {
                         org.bukkit.inventory.ItemStack item = cargoService.deserializeItem(itemMap);
                         if (item != null) {
                             stand.getWorld().dropItemNaturally(stand.getLocation(), item);
                         }
-                    });
+                    }));
                 }
+                Optional<ArmorStand> dropAt = resolver.shipStandOf(target);
                 shipRegistry.removeModule(shipId, slot);
                 moduleEntities.despawn(shipId, slot);
-                if (target instanceof ArmorStand stand) {
-                    stand.getWorld().dropItemNaturally(
-                            stand.getLocation(), moduleItem.create(removed));
-                }
+                dropAt.ifPresent(stand -> stand.getWorld().dropItemNaturally(
+                        stand.getLocation(), moduleItem.create(removed)));
                 player.sendMessage(Component.text(
                         "Removed " + moduleItem.displayName(removed) + " from slot "
                                 + slot.name().toLowerCase() + " and dropped it.",
@@ -317,13 +321,14 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        Optional<RuntimeBinding> binding = bindingRegistry.findByEntity(target.getUniqueId());
-        if (binding.isEmpty()) {
+        Optional<com.glooshy.ships.identity.ShipIdentity> shipIdOpt =
+                resolver.shipIdOf(target);
+        if (shipIdOpt.isEmpty()) {
             player.sendMessage(Component.text("That entity is not a ship.", NamedTextColor.RED));
             return;
         }
 
-        var shipId = binding.get().shipId();
+        var shipId = shipIdOpt.get();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {
             player.sendMessage(Component.text(
@@ -389,16 +394,16 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         }
 
         Entity target = player.getTargetEntity(TARGET_RAYTRACE_DISTANCE);
-        Optional<RuntimeBinding> binding = target == null
+        Optional<com.glooshy.ships.identity.ShipIdentity> shipIdOpt = target == null
                 ? Optional.empty()
-                : bindingRegistry.findByEntity(target.getUniqueId());
-        if (binding.isEmpty()) {
+                : resolver.shipIdOf(target);
+        if (shipIdOpt.isEmpty()) {
             player.sendMessage(Component.text(
                     "Look at a ship within " + TARGET_RAYTRACE_DISTANCE
                             + " blocks first.", NamedTextColor.RED));
             return;
         }
-        Optional<Ship> shipOpt = shipRegistry.find(binding.get().shipId());
+        Optional<Ship> shipOpt = shipRegistry.find(shipIdOpt.get());
         if (shipOpt.isEmpty()) {
             player.sendMessage(Component.text(
                     "Ship no longer exists in registry.", NamedTextColor.RED));

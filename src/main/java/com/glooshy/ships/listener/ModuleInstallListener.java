@@ -2,8 +2,7 @@ package com.glooshy.ships.listener;
 
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.runtime.ModuleEntityManager;
-import com.glooshy.ships.runtime.RuntimeBinding;
-import com.glooshy.ships.runtime.RuntimeBindingRegistry;
+import com.glooshy.ships.runtime.ShipEntityResolver;
 import com.glooshy.ships.ship.LifecyclePhase;
 import com.glooshy.ships.ship.ModuleSlot;
 import com.glooshy.ships.ship.ModuleType;
@@ -39,29 +38,26 @@ public final class ModuleInstallListener implements Listener {
             ModuleSlot.BOW, ModuleSlot.STERN, ModuleSlot.PORT, ModuleSlot.STARBOARD};
 
     private final ShipRegistry shipRegistry;
-    private final RuntimeBindingRegistry bindingRegistry;
+    private final ShipEntityResolver resolver;
     private final ModuleItem moduleItem;
     private final ModuleEntityManager moduleEntities;
 
     public ModuleInstallListener(
             ShipRegistry shipRegistry,
-            RuntimeBindingRegistry bindingRegistry,
+            ShipEntityResolver resolver,
             ModuleItem moduleItem,
             ModuleEntityManager moduleEntities) {
         this.shipRegistry = shipRegistry;
-        this.bindingRegistry = bindingRegistry;
+        this.resolver = resolver;
         this.moduleItem = moduleItem;
         this.moduleEntities = moduleEntities;
     }
 
     @EventHandler
     public void onPlayerInteractEntity(@NotNull PlayerInteractEntityEvent event) {
-        if (!(event.getRightClicked() instanceof ArmorStand stand)) {
-            return;
-        }
-
-        Optional<RuntimeBinding> binding = bindingRegistry.findByEntity(stand.getUniqueId());
-        if (binding.isEmpty()) {
+        Optional<com.glooshy.ships.identity.ShipIdentity> shipIdOpt =
+                resolver.shipIdOf(event.getRightClicked());
+        if (shipIdOpt.isEmpty()) {
             return; // Not a custom ship — vanilla armor stand behavior
         }
         event.setCancelled(true);
@@ -73,7 +69,7 @@ public final class ModuleInstallListener implements Listener {
             return; // Not a module item — hull/pilot listeners handle their cases
         }
 
-        var shipId = binding.get().shipId();
+        var shipId = shipIdOpt.get();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {
             return;

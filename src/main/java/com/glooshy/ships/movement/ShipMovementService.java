@@ -1,9 +1,10 @@
 package com.glooshy.ships.movement;
 
 import com.glooshy.ships.identity.ShipIdentity;
-import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
+import com.glooshy.ships.runtime.ModuleEntityManager;
+import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.ship.LifecyclePhase;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
@@ -15,43 +16,42 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Per-tick ship movement engine.
+ * Per-tick ship physics + movement engine.
  *
  * <p>Schedules a single repeating task on the main server thread. For every
- * FINALIZED ship with a live binding:
+ * ship with a live binding, in EVERY lifecycle phase:
  * <ul>
- *   <li>If a {@link Player} is a passenger, mark the {@link ShipMovement}
- *       engaged and steer the ship's yaw toward the pilot's yaw (center-turn,
- *       RQCA-15).</li>
- *   <li>Otherwise mark it disengaged (drift via friction).</li>
- *   <li>Tick the movement and apply the resulting forward velocity to the
- *       ship entity.</li>
+ *   <li><b>Vertical physics</b> ({@link WaterPhysics}): ships are IN the world
+ *       now — they rise while fully submerged, hold at the surface, and fall
+ *       when out of the water.</li>
+ *   <li><b>Hitbox + module entities</b> follow the controller.</li>
  * </ul>
  *
- * <p>Forward direction is derived from the ship's current yaw:
- * {@code (dx, dz) = (-sin(yaw_rad), cos(yaw_rad)) * currentSpeed}. This is
- * the standard Minecraft convention (yaw=0 → +Z / south).
+ * <p>For FINALIZED ships additionally: if a {@link Player} rides the ship,
+ * mark the {@link ShipMovement} engaged and steer the ship's yaw toward the
+ * pilot's yaw (center-turn, RQCA-15); tick the movement and apply the
+ * resulting forward velocity.
  *
- * <p>Movement entries are cached per ship and cleared when the ship leaves the
- * FINALIZED lifecycle phase (DESTROYED / REMOVED). The cache grows with active
- * ships; it does not grow unboundedly.
+ * <p>Forward direction is derived from the ship's current yaw:
+ * {@code (dx, dz) = (-sin(yaw_rad), cos(yaw_rad)) * currentSpeed}. This is the
+ * standard Minecraft convention (yaw=0 → +Z / south).
  *
  * <p>Implementation notes:
  * <ul>
- *   <li>V1 uses teleport() rather than setVelocity() because the ArmorStand
- *       has gravity disabled — setVelocity may be ignored by the physics
- *       engine. Teleport is deterministic.</li>
- *   <li>Vertical motion is left untouched — the ship stays at its spawn Y.
- *       Water-surface physics (floating, sinking on land) is a future slice.</li>
- *   <li>Collisions are bypassed. A future slice can re-enable via setVelocity
- *       once gravity/water physics are in place.</li>
+ *   <li>Movement is velocity-based ({@code setVelocity} each tick): the
+ *       vertical component from {@link WaterPhysics} fully owns gravity, so
+ *       vanilla gravity accumulation is overridden deterministically.</li>
+ *   <li>Ships spawned before physics existed (gravity=false NBT) are healed
+ *       to gravity=true on first contact.</li>
  * </ul>
  */
 public final class ShipMovementService implements Runnable {
@@ -60,6 +60,8 @@ public final class ShipMovementService implements Runnable {
     private final ShipRegistry shipRegistry;
     private final RuntimeBindingRegistry bindingRegistry;
     private final ModuleEntityManager moduleEntities;
+    private final ShipHitboxManager hitboxes;
+    private final WaterPhysics waterPhysics;
     private final double maxSpeed;
     private final double acceleration;
     private final double friction;
@@ -72,16 +74,21 @@ public final class ShipMovementService implements Runnable {
             @NotNull ShipRegistry shipRegistry,
             @NotNull RuntimeBindingRegistry bindingRegistry,
             @NotNull ModuleEntityManager moduleEntities,
+            @NotNull ShipHitboxManager hitboxes,
             double maxSpeed,
             double acceleration,
-            double friction) {
+            double friction,
+            double riseVelocity,
+            double sinkVelocity) {
         this.plugin = plugin;
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
         this.moduleEntities = moduleEntities;
+        this.hitboxes = hitboxes;
         this.maxSpeed = maxSpeed;
         this.acceleration = acceleration;
         this.friction = friction;
+        this.waterPhysics = new WaterPhysics(riseVelocity, sinkVelocity);
     }
 
     public synchronized void start() {
@@ -119,40 +126,40 @@ public final class ShipMovementService implements Runnable {
             }
             Ship ship = shipOpt.get();
 
-            if (ship.phase() != LifecyclePhase.FINALIZED) {
-                // Non-finalized ships don't move. Drop cache entry to bound memory.
-                movements.remove(shipId);
-                if (ship.phase() == LifecyclePhase.HULL_APPLIED) {
-                    // Module entities must exist (and self-heal) pre-finalization
-                    // too — ships in configuration carry modules around.
-                    moduleEntities.follow(shipId);
-                }
-                continue;
-            }
-
-            ShipMovement movement = movements.computeIfAbsent(
-                    shipId, k -> new ShipMovement(maxSpeed, acceleration, friction));
-
             Entity entity = Bukkit.getEntity(entityUuid);
             if (entity == null || entity.isDead()) {
-                movement.disengage();
+                movements.remove(shipId);
                 continue;
             }
 
-            Player pilot = findPilot(entity);
-            if (pilot != null) {
-                movement.engage();
-                steerTowardPilot(entity, pilot);
-            } else {
-                movement.disengage();
+            if (!entity.hasGravity()) {
+                entity.setGravity(true); // heal pre-physics ships
             }
 
-            movement.tick();
-            applyMovement(entity, movement);
+            if (ship.phase() == LifecyclePhase.FINALIZED) {
+                ShipMovement movement = movements.computeIfAbsent(
+                        shipId, k -> new ShipMovement(maxSpeed, acceleration, friction));
 
-            // Module entities hold their slot positions — follow position AND
-            // rotation, even when stationary (center-turn in place)
+                Player pilot = findPilot(entity);
+                if (pilot != null) {
+                    movement.engage();
+                    steerTowardPilot(entity, pilot);
+                } else {
+                    movement.disengage();
+                }
+
+                movement.tick();
+                applyVelocity(entity, movement.currentSpeed());
+            } else {
+                // Unfinished / hull-applied ships: no propulsion, but they
+                // still sit in the world — vertical physics applies.
+                movements.remove(shipId);
+                applyVelocity(entity, 0.0);
+            }
+
+            // Module entities hold their slot positions; hitbox rides along.
             moduleEntities.follow(shipId);
+            hitboxes.follow(shipId);
         }
     }
 
@@ -175,19 +182,20 @@ public final class ShipMovementService implements Runnable {
     }
 
     /**
-     * Translate currentSpeed into a horizontal teleport offset along the
-     * ship's current yaw. Vertical motion is left to gravity (which is
-     * currently disabled on the spawner — ships hold their spawn Y).
+     * Compose horizontal forward speed (along yaw) and vertical water physics
+     * into one velocity applied this tick. We own the full velocity vector —
+     * vanilla gravity accumulation is overridden every tick.
      */
-    private static void applyMovement(@NotNull Entity shipEntity, @NotNull ShipMovement movement) {
-        if (!movement.isMoving()) {
-            return;
-        }
+    private void applyVelocity(@NotNull Entity shipEntity, double forwardSpeed) {
         Location loc = shipEntity.getLocation();
         double yawRad = Math.toRadians(loc.getYaw());
-        double dx = -Math.sin(yawRad) * movement.currentSpeed();
-        double dz = Math.cos(yawRad) * movement.currentSpeed();
-        loc.add(dx, 0.0, dz);
-        shipEntity.teleport(loc);
+        double dx = -Math.sin(yawRad) * forwardSpeed;
+        double dz = Math.cos(yawRad) * forwardSpeed;
+
+        Block feet = loc.getBlock();
+        Block above = loc.clone().add(0.0, 1.0, 0.0).getBlock();
+        double dy = waterPhysics.verticalVelocity(feet.isLiquid(), above.isLiquid());
+
+        shipEntity.setVelocity(new Vector(dx, dy, dz));
     }
 }

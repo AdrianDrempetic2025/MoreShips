@@ -3,6 +3,8 @@ package com.glooshy.ships.listener;
 import com.glooshy.ships.cargo.CargoService;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.runtime.ModuleEntityManager;
+import com.glooshy.ships.runtime.ShipEntityResolver;
+import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.runtime.RuntimeBinding;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
@@ -54,17 +56,21 @@ public final class ShipEntityBreakListener implements Listener {
 
     private final ShipCoreItem shipCoreItem;
     private final RuntimeBindingRegistry bindingRegistry;
+    private final ShipEntityResolver resolver;
     private final ShipRegistry shipRegistry;
     private final ShipTeardownService teardownService;
     private final ModuleItem moduleItem;
     private final CargoService cargoService;
     private final ModuleEntityManager moduleEntities;
+    private final ShipHitboxManager hitboxes;
 
     public ShipEntityBreakListener(
             ShipCoreItem shipCoreItem,
             ModuleItem moduleItem,
             CargoService cargoService,
             ModuleEntityManager moduleEntities,
+            ShipEntityResolver resolver,
+            ShipHitboxManager hitboxes,
             RuntimeBindingRegistry bindingRegistry,
             ShipRegistry shipRegistry,
             ShipTeardownService teardownService) {
@@ -72,6 +78,8 @@ public final class ShipEntityBreakListener implements Listener {
         this.moduleItem = moduleItem;
         this.cargoService = cargoService;
         this.moduleEntities = moduleEntities;
+        this.resolver = resolver;
+        this.hitboxes = hitboxes;
         this.bindingRegistry = bindingRegistry;
         this.shipRegistry = shipRegistry;
         this.teardownService = teardownService;
@@ -79,19 +87,21 @@ public final class ShipEntityBreakListener implements Listener {
 
     @EventHandler
     public void onEntityDamage(@NotNull EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof ArmorStand stand)) {
-            return;
-        }
-
-        Optional<RuntimeBinding> binding = bindingRegistry.findByEntity(stand.getUniqueId());
-        if (binding.isEmpty()) {
+        var damaged = event.getEntity();
+        Optional<com.glooshy.ships.identity.ShipIdentity> shipIdOpt = resolver.shipIdOf(damaged);
+        if (shipIdOpt.isEmpty()) {
             return; // Not a custom ship
         }
+        Optional<ArmorStand> standOpt = resolver.shipStandOf(damaged);
+        if (standOpt.isEmpty()) {
+            return;
+        }
+        ArmorStand stand = standOpt.get();
 
         // Always cancel — plugin manages HP via the Ship record
         event.setCancelled(true);
 
-        var shipId = binding.get().shipId();
+        var shipId = shipIdOpt.get();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {
             bindingRegistry.release(shipId);
@@ -127,6 +137,7 @@ public final class ShipEntityBreakListener implements Listener {
         dropModules(stand, ship);
         dropCargo(stand, ship);
         moduleEntities.despawnAll(ship.identity());
+        hitboxes.despawn(ship.identity());
 
         teardownService.teardown(ship.identity());
         stand.remove();
@@ -150,6 +161,7 @@ public final class ShipEntityBreakListener implements Listener {
             dropModules(stand, after);
             dropCargo(stand, after);
             moduleEntities.despawnAll(ship.identity());
+            hitboxes.despawn(ship.identity());
             try {
                 shipRegistry.transition(ship.identity(), LifecyclePhase.DESTROYED);
             } catch (IllegalStateException ignored) {

@@ -21,8 +21,11 @@ import com.glooshy.ships.persistence.ModuleEntityStore;
 import com.glooshy.ships.persistence.ShipStore;
 import com.glooshy.ships.persistence.YamlBindingStore;
 import com.glooshy.ships.persistence.YamlModuleEntityStore;
+import com.glooshy.ships.persistence.YamlShipHitboxStore;
 import com.glooshy.ships.persistence.YamlShipStore;
 import com.glooshy.ships.runtime.ModuleEntityManager;
+import com.glooshy.ships.runtime.ShipEntityResolver;
+import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.runtime.ShipEntitySpawner;
 import com.glooshy.ships.ship.Ship;
@@ -48,6 +51,8 @@ public final class MoreShips extends JavaPlugin {
     private BindingStore bindingStore;
     private ModuleEntityStore moduleEntityStore;
     private ModuleEntityManager moduleEntities;
+    private ShipHitboxManager hitboxes;
+    private YamlShipHitboxStore hitboxStore;
     private ShipMovementService movementService;
 
     @Override
@@ -64,6 +69,7 @@ public final class MoreShips extends JavaPlugin {
         shipStore = new YamlShipStore(dataFolder.resolve("ships.yml"));
         bindingStore = new YamlBindingStore(dataFolder.resolve("bindings.yml"));
         moduleEntityStore = new YamlModuleEntityStore(dataFolder.resolve("module-entities.yml"));
+        hitboxStore = new YamlShipHitboxStore(dataFolder.resolve("ship-hitboxes.yml"));
 
         ShipCoreItem shipCoreItem = new ShipCoreItem(
                 shipCoreMarker,
@@ -81,6 +87,9 @@ public final class MoreShips extends JavaPlugin {
         CargoService cargoService = new CargoService(shipRegistry);
         moduleEntities = new ModuleEntityManager(
                 shipIdKey, moduleSlotKey, shipRegistry, bindingRegistry, moduleItem);
+        hitboxes = new ShipHitboxManager(
+                shipIdKey, bindingRegistry, config.shipHitboxWidth(), config.shipHitboxHeight());
+        ShipEntityResolver resolver = new ShipEntityResolver(bindingRegistry, hitboxes);
 
         // Load persisted state before listeners attach
         loadPersistedState();
@@ -100,15 +109,15 @@ public final class MoreShips extends JavaPlugin {
 
         ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
                 shipCoreItem, moduleItem, cargoService, moduleEntities,
-                bindingRegistry, shipRegistry, teardownService);
+                resolver, hitboxes, bindingRegistry, shipRegistry, teardownService);
         getServer().getPluginManager().registerEvents(breakListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
-                shipRegistry, bindingRegistry, hullValidator);
+                shipRegistry, resolver, hullValidator);
         getServer().getPluginManager().registerEvents(hullListener, this);
 
         ModuleInstallListener moduleListener = new ModuleInstallListener(
-                shipRegistry, bindingRegistry, moduleItem, moduleEntities);
+                shipRegistry, resolver, moduleItem, moduleEntities);
         getServer().getPluginManager().registerEvents(moduleListener, this);
 
         getServer().getPluginManager().registerEvents(
@@ -119,15 +128,18 @@ public final class MoreShips extends JavaPlugin {
 
         if (config.movementEnabled()) {
             getServer().getPluginManager().registerEvents(
-                    new ShipPilotListener(shipRegistry, bindingRegistry), this);
+                    new ShipPilotListener(shipRegistry, resolver), this);
             movementService = new ShipMovementService(
                     this,
                     shipRegistry,
                     bindingRegistry,
                     moduleEntities,
+                    hitboxes,
                     config.movementMaxSpeed(),
                     config.movementAcceleration(),
-                    config.movementFriction());
+                    config.movementFriction(),
+                    config.physicsRiseVelocity(),
+                    config.physicsSinkVelocity());
             movementService.start();
             getLogger().info("Movement service started: maxSpeed=" + config.movementMaxSpeed()
                     + " accel=" + config.movementAcceleration()
@@ -138,7 +150,7 @@ public final class MoreShips extends JavaPlugin {
 
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener,
-                cargoService, moduleEntities);
+                cargoService, moduleEntities, resolver);
         PluginCommand command = getCommand("moreships");
         if (command != null) {
             command.setExecutor(shipsCommand);
@@ -147,7 +159,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-10). Module entities (own hitboxes) loaded.");
+        getLogger().info("MoreShips enabled (BUILD-12). Physical ships: hitbox + gravity + floating.");
     }
 
     @Override
@@ -181,6 +193,13 @@ public final class MoreShips extends JavaPlugin {
         } catch (IOException e) {
             getLogger().warning("Failed to load module-entities.yml: " + e.getMessage());
         }
+        try {
+            var hitboxBindings = hitboxStore.load();
+            hitboxes.load(hitboxBindings);
+            getLogger().info("Loaded " + hitboxBindings.size() + " ship hitboxes from disk.");
+        } catch (IOException e) {
+            getLogger().warning("Failed to load ship-hitboxes.yml: " + e.getMessage());
+        }
     }
 
     private void savePersistedState() {
@@ -204,6 +223,13 @@ public final class MoreShips extends JavaPlugin {
             getLogger().info("Saved " + moduleEntityBindings.size() + " module entities to disk.");
         } catch (IOException e) {
             getLogger().severe("Failed to save module-entities.yml: " + e.getMessage());
+        }
+        try {
+            var hitboxBindings = hitboxes.snapshot();
+            hitboxStore.save(hitboxBindings);
+            getLogger().info("Saved " + hitboxBindings.size() + " ship hitboxes to disk.");
+        } catch (IOException e) {
+            getLogger().severe("Failed to save ship-hitboxes.yml: " + e.getMessage());
         }
     }
 }

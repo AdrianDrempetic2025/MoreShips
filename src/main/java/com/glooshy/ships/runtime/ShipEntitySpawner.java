@@ -36,7 +36,7 @@ public final class ShipEntitySpawner {
     public UUID spawnUnfinishedShip(Location location, ShipIdentity shipId) {
         ArmorStand stand = location.getWorld().spawn(location, ArmorStand.class, as -> {
             as.setVisible(true);
-            as.setGravity(false);
+            as.setGravity(true);
             as.setGlowing(true);
             as.customName(Component.text(
                     ENTITY_LABEL + " " + shortId(shipId), NamedTextColor.AQUA));
