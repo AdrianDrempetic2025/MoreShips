@@ -105,6 +105,17 @@ public final class ShipEntityBreakListener implements Listener {
         // Always cancel — plugin manages HP via the Ship record
         event.setCancelled(true);
 
+        // Environmental causes never harm ships: the controller ArmorStand
+        // takes drowning/suffocation like any entity ("ships drowning in
+        // water" bug). Only real combat sources reach ship HP.
+        switch (event.getCause()) {
+            case DROWNING, SUFFOCATION, FIRE, FIRE_TICK, LAVA, HOT_FLOOR, CRAMMING,
+                 DRYOUT, FREEZE, STARVATION, POISON, WITHER, KILL, VOID, CUSTOM:
+                return;
+            default:
+                break;
+        }
+
         var shipId = shipIdOpt.get();
         Optional<Ship> shipOpt = shipRegistry.find(shipId);
         if (shipOpt.isEmpty()) {

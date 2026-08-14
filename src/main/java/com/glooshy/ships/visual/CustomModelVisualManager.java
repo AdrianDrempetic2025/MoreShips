@@ -72,17 +72,16 @@ public final class CustomModelVisualManager {
     static final class ModelSpec {
         final List<HullCube> hullCubes;
         final NamespacedKey trimItemModel;
+        /** True center of the WHOLE model (bbox of all elements, px) — the
+         *  artist's pivot-based ship center. Maps onto the controller. */
+        final double[] center;
 
-        ModelSpec(List<HullCube> hullCubes, NamespacedKey trimItemModel) {
+        ModelSpec(List<HullCube> hullCubes, NamespacedKey trimItemModel, double[] center) {
             this.hullCubes = List.copyOf(hullCubes);
             this.trimItemModel = trimItemModel;
+            this.center = center;
         }
     }
-
-    /** Vertical lift of the whole model relative to the controller (blocks).
-     *  The model's mass sits below its [8,8,8] origin, so without this the
-     *  hull rides half a block underwater. */
-    private static final float MODEL_Y_OFFSET = 0.5f;
 
     private final RuntimeBindingRegistry bindingRegistry;
     private final ShipRegistry shipRegistry;
@@ -133,11 +132,29 @@ public final class CustomModelVisualManager {
                         axis, angle, rotOrigin));
             }
             models.put(size, new ModelSpec(cubes,
-                    new NamespacedKey("moreships", trimItemModel)));
+                    new NamespacedKey("moreships", trimItemModel), bboxCenter(root)));
             logger.info("Custom model for " + size + ": " + cubes.size() + " hull cubes");
         } catch (Exception e) {
             logger.warning("Failed to load custom model " + resource + ": " + e.getMessage());
         }
+    }
+
+    /** Bounding-box center of ALL elements in the model (px). */
+    private static double[] bboxCenter(JsonObject root) {
+        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, minZ = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE, maxZ = -Double.MAX_VALUE;
+        for (JsonElement el : root.getAsJsonArray("elements")) {
+            JsonObject cube = el.getAsJsonObject();
+            double[] from = px(cube.getAsJsonArray("from"));
+            double[] to = px(cube.getAsJsonArray("to"));
+            minX = Math.min(minX, Math.min(from[0], to[0]));
+            minY = Math.min(minY, Math.min(from[1], to[1]));
+            minZ = Math.min(minZ, Math.min(from[2], to[2]));
+            maxX = Math.max(maxX, Math.max(from[0], to[0]));
+            maxY = Math.max(maxY, Math.max(from[1], to[1]));
+            maxZ = Math.max(maxZ, Math.max(from[2], to[2]));
+        }
+        return new double[] {(minX + maxX) / 2.0, (minY + maxY) / 2.0, (minZ + maxZ) / 2.0};
     }
 
     private static double[] px(JsonArray arr) {
@@ -240,12 +257,12 @@ public final class CustomModelVisualManager {
                     (float) (center[1] - cube.rotOrigin()[1]),
                     (float) (center[2] - cube.rotOrigin()[2]));
             offset.rotate(cubeRot);
-            offset.add((float) (cube.rotOrigin()[0] - 8.0),
-                    (float) (cube.rotOrigin()[1] - 8.0),
-                    (float) (cube.rotOrigin()[2] - 8.0));
+            double[] c = spec.center;
+            offset.add((float) (cube.rotOrigin()[0] - c[0]),
+                    (float) (cube.rotOrigin()[1] - c[1]),
+                    (float) (cube.rotOrigin()[2] - c[2]));
 
             Vector3f world = new Vector3f(offset).rotate(shipRot).div(16.0f);
-            world.y += MODEL_Y_OFFSET;
             Location target = base.clone().add(world.x, world.y, world.z);
             if (display.getLocation().distanceSquared(target) > 0.01) {
                 display.teleport(target);
@@ -279,8 +296,15 @@ public final class CustomModelVisualManager {
                 if (display.getLocation().distanceSquared(base) > 0.01) {
                     display.teleport(base);
                 }
-                Vector3f transl = new Vector3f(-0.5f, -0.5f, -0.5f).rotate(shipRot);
-                transl.y += MODEL_Y_OFFSET;
+                // The ItemDisplay natively anchors the model's [8,8,8]px at the
+                // entity; shifting by (8 - C)/16 puts the model's TRUE center
+                // (same C the hull cubes use) on the controller — both layers
+                // now share one frame and stay glued.
+                double[] c = spec.center;
+                Vector3f transl = new Vector3f(
+                        (float) ((8.0 - c[0]) / 16.0),
+                        (float) ((8.0 - c[1]) / 16.0),
+                        (float) ((8.0 - c[2]) / 16.0)).rotate(shipRot);
                 Transformation t = new Transformation(
                         transl, new Quaternionf(shipRot),
                         new Vector3f(1.0f, 1.0f, 1.0f), new Quaternionf());
