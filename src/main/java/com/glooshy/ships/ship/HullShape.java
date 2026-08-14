@@ -68,6 +68,13 @@ public final class HullShape {
     /** Radius around the ship center kept free of solidity cells. */
     public static final double DECK_CENTER_CLEARENCE = 1.1;
 
+    /** The deck cell directly under the controller stand. The stand itself is
+     *  non-collidable and teleports, so this cell is safe — it closes the
+     *  center hole in the solid deck. */
+    public static Cell centerCell() {
+        return new Cell(0.0, 0.0);
+    }
+
     /**
      * The union of interaction segments must cover the hull footprint within
      * a small tolerance (used by tests).

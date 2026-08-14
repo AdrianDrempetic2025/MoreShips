@@ -119,7 +119,7 @@ public final class ShipHitboxManager {
     }
 
     private int expectedCount(ShipSize size) {
-        return HullShape.segmentCentersZ(size).size() + HullShape.solidCells(size).size();
+        return HullShape.segmentCentersZ(size).size() + HullShape.solidCells(size).size() + 1;
     }
 
     private List<UUID> spawnHullEntities(ShipIdentity shipId, ShipSize size, Location base) {
@@ -139,7 +139,10 @@ public final class ShipHitboxManager {
             byEntity.put(hitbox.getUniqueId(), shipId);
         }
 
-        for (HullShape.Cell cell : HullShape.solidCells(size)) {
+        java.util.List<HullShape.Cell> cells =
+                new java.util.ArrayList<>(HullShape.solidCells(size));
+        cells.add(HullShape.centerCell()); // deck cell under the controller stand
+        for (HullShape.Cell cell : cells) {
             Location loc = localToWorld(base, cell.localX(), cell.localZ())
                     .add(0.0, height / 2.0 - 0.5, 0.0);
             Shulker solid = base.getWorld().spawn(loc, Shulker.class, sh -> {
@@ -162,7 +165,9 @@ public final class ShipHitboxManager {
     private void positionHullEntities(ShipIdentity shipId, ShipSize size, Location base,
                                       List<UUID> tracked) {
         int segments = HullShape.segmentCentersZ(size).size();
-        List<HullShape.Cell> cells = HullShape.solidCells(size);
+        List<HullShape.Cell> cells =
+                new java.util.ArrayList<>(HullShape.solidCells(size));
+        cells.add(HullShape.centerCell());
         int total = segments + cells.size();
         for (int i = 0; i < Math.min(total, tracked.size()); i++) {
             Entity entity = Bukkit.getEntity(tracked.get(i));
