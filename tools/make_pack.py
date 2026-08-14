@@ -51,7 +51,9 @@ def main():
             pack, "assets/moreships/models/item", f"{item_model}.json"), "w"), indent=1)
         shutil.copy(os.path.join(ROOT, "assets", size, texture),
                     os.path.join(pack, "assets/moreships/textures/item", texture))
-        json.dump({"model": {"type": "model", "model": f"moreships:item/{item_model}"}},
+        # 26.x requires the namespaced type "minecraft:model" — bare "model"
+        # (the 1.21.4 shorthand) silently fails to resolve client-side
+        json.dump({"model": {"type": "minecraft:model", "model": f"moreships:item/{item_model}"}},
                   open(os.path.join(pack, "assets/moreships/items", f"{item_model}.json"), "w"))
         print(f"{size}: {len(trim['elements'])} trim cubes")
 
