@@ -273,9 +273,12 @@ public final class ShipMovementService implements Runnable {
                 : null;
         if (collision != null && (dx != 0.0 || dz != 0.0)) {
             CollisionBox box = collision;
+            List<double[]> otherShips = otherShipColliders(
+                    ship.identity(), ship.size(), loc);
             double[] clamped = box.clampMovement(
                     loc.getX(), loc.getZ(), dx, dz,
-                    (x, z) -> collidesAt(box, shipEntity, loc.getY(), x, z));
+                    (x, z) -> collidesAt(box, shipEntity, loc.getY(), x, z)
+                            || collidesWithOtherShip(otherShips, x, z));
             dx = clamped[0];
             dz = clamped[1];
         }
@@ -284,7 +287,58 @@ public final class ShipMovementService implements Runnable {
         Block above = loc.clone().add(0.0, 1.0, 0.0).getBlock();
         double dy = waterPhysics.verticalVelocity(feet.isLiquid(), above.isLiquid());
 
-        shipEntity.setVelocity(new Vector(dx, dy, dz));
+        // Teleport-based movement: entity collision (players, the ship's own
+        // solid deck, module entities) can never block the hull — terrain and
+        // other ships are checked explicitly above. Passengers stay mounted
+        // (ignorePassengers=true).
+        Location target = loc.clone().add(dx, dy, dz);
+        shipEntity.teleport(target, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN,
+                io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
+    }
+
+    /**
+     * Hull colliders of every OTHER ship near a position: {centerX, centerZ,
+     * combinedRadius}. Radius is the other hull's half-span plus ours.
+     */
+    private List<double[]> otherShipColliders(ShipIdentity self, com.glooshy.ships.ship.ShipSize size,
+                                              Location near) {
+        List<double[]> colliders = new java.util.ArrayList<>();
+        double myHalf = size.hitboxWidth() / 2.0;
+        for (RuntimeBinding other : bindingRegistry.snapshot()) {
+            if (other.shipId().equals(self)) {
+                continue;
+            }
+            Ship otherShip = shipRegistry.find(other.shipId()).orElse(null);
+            if (otherShip == null) {
+                continue;
+            }
+            Entity otherEntity = Bukkit.getEntity(other.entityUuid());
+            if (otherEntity == null || otherEntity.isDead()) {
+                continue;
+            }
+            Location otherLoc = otherEntity.getLocation();
+            if (otherLoc.getWorld() == null || otherLoc.getWorld() != near.getWorld()) {
+                continue;
+            }
+            if (otherLoc.distanceSquared(near) > 32 * 32) {
+                continue;
+            }
+            colliders.add(new double[] {
+                    otherLoc.getX(), otherLoc.getZ(),
+                    myHalf + otherShip.size().hitboxWidth() / 2.0});
+        }
+        return colliders;
+    }
+
+    private static boolean collidesWithOtherShip(List<double[]> colliders, double x, double z) {
+        for (double[] c : colliders) {
+            double ddx = x - c[0];
+            double ddz = z - c[1];
+            if (ddx * ddx + ddz * ddz < c[2] * c[2]) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
