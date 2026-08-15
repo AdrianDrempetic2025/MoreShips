@@ -22,7 +22,7 @@ SIZES = {
 # name -> length stretch factor (relative to the small model's 3-block spec)
 STRETCH_Z = {"small": 1.0, "medium": 4.0 / 3.0, "large": 8.0 / 3.0}
 # Jan's eye calibration: medium/large render 2 blocks wide, should be 3
-WIDTH_BOOST = {"small": 1.0, "medium": 1.5, "large": 1.5}
+WIDTH_BOOST = {"small": 1.0, "medium": 1.5, "large": 2.5}
 # Large should be ~2 blocks longer than its stretched length
 EXTRA_Z = {"small": 1.0, "medium": 1.0, "large": 1.14}
 
