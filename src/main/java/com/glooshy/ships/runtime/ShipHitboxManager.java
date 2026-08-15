@@ -129,6 +129,9 @@ public final class ShipHitboxManager {
 
         for (double centerZ : HullShape.segmentCentersZ(size)) {
             Location loc = localToWorld(base, 0.0, centerZ);
+            if (!loc.getWorld().isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
+                continue;
+            }
             Interaction hitbox = base.getWorld().spawn(loc, Interaction.class, ie -> {
                 ie.setInteractionWidth((float) segSize);
                 ie.setInteractionHeight((float) height);
@@ -146,6 +149,9 @@ public final class ShipHitboxManager {
         for (HullShape.Cell cell : cells) {
             Location loc = localToWorld(base, cell.localX(), cell.localZ())
                     .add(0.0, height / 2.0 - 1.0, 0.0); // Session 2: shulker floor half a block lower
+            if (!loc.getWorld().isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
+                continue;
+            }
             Shulker solid = base.getWorld().spawn(loc, Shulker.class, sh -> {
                 sh.setAI(false);
                 sh.setGravity(false);

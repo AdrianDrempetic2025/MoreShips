@@ -84,6 +84,9 @@ public final class ShipMovementService implements Runnable {
 
     private final Map<ShipIdentity, ShipMovement> movements = new ConcurrentHashMap<>();
     private volatile BukkitTask task;
+    private long tickCounter;
+    /** Orphan sweep cadence (ticks). */
+    private static final long SWEEP_INTERVAL = 100L;
 
     public ShipMovementService(
             @NotNull JavaPlugin plugin,
@@ -161,6 +164,8 @@ public final class ShipMovementService implements Runnable {
 
     @Override
     public void run() {
+        tickCounter++;
+        boolean sweep = tickCounter % SWEEP_INTERVAL == 0;
         List<RuntimeBinding> snapshot;
         try {
             snapshot = bindingRegistry.snapshot();
@@ -267,6 +272,37 @@ public final class ShipMovementService implements Runnable {
             moduleEntities.follow(shipId);
             hitboxes.follow(shipId);
             modelVisuals.follow(shipId);
+
+            if (sweep) {
+                removeOrphanControllerCopies(entity, shipId);
+            }
+        }
+    }
+
+    /**
+     * Logout-during-ride bug: chunk unload used to make the self-heal spawn a
+     * SECOND controller stand; when the chunk returned, both existed and the
+     * orphan shadowed every interaction. Sweep away any PDC-marked armor
+     * stand of this ship that is neither the bound controller nor a tracked
+     * module entity.
+     */
+    private void removeOrphanControllerCopies(@NotNull Entity bound, @NotNull ShipIdentity shipId) {
+        var tracked = moduleEntities.trackedEntities(shipId);
+        for (Entity nearby : bound.getWorld().getNearbyEntities(
+                bound.getLocation(), 8, 4, 24)) {
+            if (!(nearby instanceof org.bukkit.entity.ArmorStand stand)
+                    || nearby.getUniqueId().equals(bound.getUniqueId())
+                    || tracked.contains(nearby.getUniqueId())) {
+                continue;
+            }
+            String marked = stand.getPersistentDataContainer()
+                    .get(shipIdKey, org.bukkit.persistence.PersistentDataType.STRING);
+            if (shipId.encoded().equals(marked)) {
+                for (Entity passenger : stand.getPassengers()) {
+                    stand.removePassenger(passenger);
+                }
+                stand.remove();
+            }
         }
     }
 
@@ -330,6 +366,9 @@ public final class ShipMovementService implements Runnable {
             return; // no position anchor — nothing we can heal from
         }
         org.bukkit.Location loc = anchor.getLocation().add(0.0, -0.5, 0.0); // controller rides below deck
+        if (!loc.getWorld().isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
+            return; // never spawn into an unloaded chunk (duplicates on load)
+        }
         String shortId = shipId.encoded();
         int dash = shortId.indexOf('-');
         if (dash > 0) {

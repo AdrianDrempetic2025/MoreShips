@@ -170,6 +170,12 @@ public final class ModuleEntityManager {
         return stack;
     }
 
+    /** Live-tracked module entity UUIDs of a ship (orphan sweep exclusion). */
+    public java.util.Set<UUID> trackedEntities(ShipIdentity shipId) {
+        Map<ModulePos, UUID> slots = byShip.get(shipId);
+        return slots == null ? java.util.Set.of() : java.util.Set.copyOf(slots.values());
+    }
+
     /** Remove the module entity (module removed / moved). */
     public void despawn(ShipIdentity shipId, ModulePos pos) {
         Map<ModulePos, UUID> slots = byShip.get(shipId);
@@ -211,16 +217,23 @@ public final class ModuleEntityManager {
             return;
         }
 
-        // Self-heal: registry modules without a live entity get respawned
+        // Self-heal: registry modules without a live entity get respawned —
+        // but NEVER into an unloaded chunk: a module stand whose chunk is
+        // unloaded (e.g. a rider logged out) is alive on disk, and spawning
+        // a fresh one here DUPLICATES it when the chunk comes back
         for (Map.Entry<ModulePos, ModuleType> entry : ship.modules().entrySet()) {
             ModulePos pos = entry.getKey();
             UUID uuid = byShip.getOrDefault(shipId, Map.of()).get(pos);
             var existing = uuid == null ? null : Bukkit.getEntity(uuid);
             if (existing == null || existing.isDead()) {
+                Location target = moduleLocation(base, shipId, pos);
+                if (!isChunkLoaded(target)) {
+                    continue;
+                }
                 if (uuid != null) {
                     byEntity.remove(uuid);
                 }
-                spawnStand(shipId, pos, entry.getValue(), moduleLocation(base, shipId, pos));
+                spawnStand(shipId, pos, entry.getValue(), target);
             }
         }
 
@@ -249,6 +262,9 @@ public final class ModuleEntityManager {
                 stand.getEquipment().setHelmet(wornVisualOf(entry.getValue()));
             }
             Location target = moduleLocation(base, shipId, entry.getKey());
+            if (!isChunkLoaded(target)) {
+                continue; // do not force-load chunks by teleporting into them
+            }
             // A cannon holding a live aim keeps its barrel pointed there;
             // everything else (and expired aims) rests aligned with the ship
             if (entry.getValue() == ModuleType.CANNON && cannonAims != null) {
@@ -312,6 +328,11 @@ public final class ModuleEntityManager {
         }
         // Deck reference: the controller stand rides 0.5 below the deck
         return entity.getLocation().add(0.0, 0.5, 0.0);
+    }
+
+    private static boolean isChunkLoaded(Location loc) {
+        return loc.getWorld() != null
+                && loc.getWorld().isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4);
     }
 
     private Location moduleLocation(Location base, ShipIdentity shipId, ModulePos pos) {
