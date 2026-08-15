@@ -213,7 +213,7 @@ public final class CustomModelVisualManager {
         if (shipEntity == null || shipEntity.isDead()) {
             return;
         }
-        Location base = shipEntity.getLocation();
+        Location base = shipEntity.getLocation().add(0.0, 0.5, 0.0); // deck reference
 
         List<UUID> tracked = new ArrayList<>(byShip.getOrDefault(shipId, List.of()));
         tracked.removeIf(uuid -> {

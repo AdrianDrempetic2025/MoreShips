@@ -39,7 +39,11 @@ public final class ShipEntitySpawner {
     }
 
     public UUID spawnUnfinishedShip(Location location, ShipIdentity shipId) {
-        ArmorStand stand = location.getWorld().spawn(location, ArmorStand.class, as -> {
+        // Session 2: the controller rides half a block LOWER than the deck —
+        // its head (model attach + pilot seat) sits level with the shulker
+        // floor. The deck-following managers compensate with +0.5.
+        Location spawnAt = location.clone().add(0.0, -0.5, 0.0);
+        ArmorStand stand = spawnAt.getWorld().spawn(spawnAt, ArmorStand.class, as -> {
             as.setVisible(false); // the custom model is the visual; helm = leather hat
             as.setSmall(true); // lowers the passenger seat ~1.5 blocks
             as.setGravity(true);

@@ -37,4 +37,28 @@ public final class CannonInventoryListener implements Listener {
                     NamedTextColor.RED));
         }
     }
+
+    /** Filler slots (9-17) between the cannon and player regions are not a place. */
+    @EventHandler
+    public void onInventoryClick(@NotNull org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (!(event.getInventory().getHolder() instanceof CannonService.Holder)) {
+            return;
+        }
+        if (CannonService.isFillerSlot(event.getRawSlot())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(@NotNull org.bukkit.event.inventory.InventoryDragEvent event) {
+        if (!(event.getInventory().getHolder() instanceof CannonService.Holder)) {
+            return;
+        }
+        for (int rawSlot : event.getRawSlots()) {
+            if (CannonService.isFillerSlot(rawSlot)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
 }

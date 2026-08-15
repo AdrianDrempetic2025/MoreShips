@@ -314,7 +314,7 @@ public final class ShipMovementService implements Runnable {
         if (anchor == null) {
             return; // no position anchor — nothing we can heal from
         }
-        org.bukkit.Location loc = anchor.getLocation();
+        org.bukkit.Location loc = anchor.getLocation().add(0.0, -0.5, 0.0); // controller rides below deck
         String shortId = shipId.encoded();
         int dash = shortId.indexOf('-');
         if (dash > 0) {

@@ -187,6 +187,23 @@ public final class ModuleEntityManager {
             // A cannon holding a live aim keeps its barrel pointed there;
             // everything else (and expired aims) rests aligned with the ship
             if (entry.getValue() == ModuleType.CANNON && cannonAims != null) {
+                // Seated gunner: their CAMERA steers the barrel live (clamped
+                // to the 180° arc around the module's outward direction)
+                for (org.bukkit.entity.Entity passenger : entity.getPassengers()) {
+                    if (passenger instanceof org.bukkit.entity.Player gunner) {
+                        float outward = (float) com.glooshy.ships.combat.CannonService
+                                .outwardYawDeg(base.getYaw(),
+                                        entry.getKey().localX(ship.size()),
+                                        entry.getKey().localZ(ship.size()));
+                        float aimYaw = com.glooshy.ships.combat.CannonAimTracker
+                                .clampToArc(gunner.getEyeLocation().getYaw(), outward, 90.0f);
+                        float aimPitch = Math.max(-45.0f, Math.min(15.0f,
+                                gunner.getEyeLocation().getPitch()));
+                        cannonAims.set(shipId, entry.getKey(), aimYaw, aimPitch,
+                                System.currentTimeMillis() + 500L);
+                        break;
+                    }
+                }
                 var aim = cannonAims.live(shipId, entry.getKey());
                 if (aim != null) {
                     target.setYaw(aim.yaw());
@@ -228,7 +245,8 @@ public final class ModuleEntityManager {
         if (entity == null || entity.isDead()) {
             return null;
         }
-        return entity.getLocation();
+        // Deck reference: the controller stand rides 0.5 below the deck
+        return entity.getLocation().add(0.0, 0.5, 0.0);
     }
 
     private Location moduleLocation(Location base, ShipIdentity shipId, ModulePos pos) {

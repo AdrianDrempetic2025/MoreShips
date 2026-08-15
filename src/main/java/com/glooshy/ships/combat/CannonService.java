@@ -250,13 +250,16 @@ public final class CannonService {
                 NamedTextColor.GREEN));
     }
 
-    /** Open the cannon's own inventory UI. */
+    /**
+     * Open the cannon management UI: cannon inventory on top, the player's own
+     * inventory below - loading is plain item dragging between the two.
+     */
     public void openInventory(@NotNull Player player, @NotNull Ship ship, @NotNull ModulePos pos) {
         Inventory inventory = player.getServer().createInventory(
                 new Holder(ship.identity(), pos),
-                CannonState.INVENTORY_SIZE,
+                54,
                 Component.text("Cannon " + pos.encoded()
-                        + " — snowballs + furnace fuel", NamedTextColor.GOLD));
+                        + " - snowballs + furnace fuel", NamedTextColor.GOLD));
         CannonState state = ship.cannons().getOrDefault(pos, CannonState.empty());
         state.inventory().forEach((slot, itemMap) -> {
             if (slot < 0 || slot >= CannonState.INVENTORY_SIZE) {
@@ -267,15 +270,53 @@ public final class CannonService {
                 inventory.setItem(slot, item);
             }
         });
+        ItemStack filler = fillerPane();
+        for (int slot = CannonState.INVENTORY_SIZE; slot < 18; slot++) {
+            inventory.setItem(slot, filler);
+        }
+        ItemStack[] playerContents = player.getInventory().getContents();
+        for (int i = 0; i < 36; i++) {
+            ItemStack item = playerContents[i];
+            inventory.setItem(18 + i, item == null ? null : item.clone());
+        }
         openInventories.computeIfAbsent(ship.identity(), k -> new ConcurrentHashMap<>())
                 .put(pos, inventory);
         player.openInventory(inventory);
     }
 
+    private static ItemStack fillerPane() {
+        ItemStack pane = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        var meta = pane.getItemMeta();
+        meta.displayName(Component.text(" ", NamedTextColor.DARK_GRAY));
+        pane.setItemMeta(meta);
+        return pane;
+    }
+
+    /** Slots 9-17 of the cannon UI (between cannon and player regions). */
+    public static boolean isFillerSlot(int rawSlot) {
+        return rawSlot >= CannonState.INVENTORY_SIZE && rawSlot < 18;
+    }
+
     /** InventoryCloseEvent path: persist the cannon inventory back to the ship. */
     public boolean save(@NotNull Holder holder, @NotNull Inventory inventory, @NotNull Player player) {
+        // Player region writeback: whatever ended up in slots 18-53 IS the
+        // player's inventory now (items may have been shuffled between regions)
+        if (inventory.getSize() >= 54) {
+            for (int i2 = 0; i2 < 36; i2++) {
+                player.getInventory().setItem(i2, inventory.getItem(18 + i2));
+            }
+            // Items that slipped into filler slots (shift-click quirks) go back too
+            for (int slot = CannonState.INVENTORY_SIZE; slot < 18; slot++) {
+                ItemStack stranded = inventory.getItem(slot);
+                if (stranded != null && !stranded.getType().isAir()
+                        && stranded.getType() != Material.GRAY_STAINED_GLASS_PANE) {
+                    player.getInventory().addItem(stranded);
+                    inventory.setItem(slot, null);
+                }
+            }
+        }
         Map<Integer, Map<String, Object>> contents = new HashMap<>();
-        for (int slot = 0; slot < inventory.getSize(); slot++) {
+        for (int slot = 0; slot < CannonState.INVENTORY_SIZE; slot++) {
             ItemStack item = inventory.getItem(slot);
             if (item == null || item.getType().isAir()) {
                 continue;
@@ -320,7 +361,8 @@ public final class CannonService {
         Set<ModulePos> handled = new java.util.HashSet<>();
         for (Map.Entry<ModulePos, Inventory> entry : open.entrySet()) {
             Inventory inv = entry.getValue();
-            for (ItemStack item : inv.getContents()) {
+            for (int slot = 0; slot < Math.min(inv.getSize(), CannonState.INVENTORY_SIZE); slot++) {
+                ItemStack item = inv.getItem(slot);
                 if (item != null && !item.getType().isAir()) {
                     dropAt.getWorld().dropItemNaturally(dropAt, item);
                 }

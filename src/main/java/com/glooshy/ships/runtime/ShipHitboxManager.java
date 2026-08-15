@@ -89,7 +89,8 @@ public final class ShipHitboxManager {
             return;
         }
         ShipSize size = ship.size();
-        Location base = shipEntity.getLocation();
+        // Deck reference: the controller stand rides 0.5 below the deck
+        Location base = shipEntity.getLocation().add(0.0, 0.5, 0.0);
 
         List<UUID> tracked = new ArrayList<>(byShip.getOrDefault(shipId, List.of()));
         tracked.removeIf(uuid -> {

@@ -1,6 +1,7 @@
 package com.glooshy.ships.listener;
 
 import com.glooshy.ships.cargo.CargoService;
+import com.glooshy.ships.combat.CannonService;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.runtime.ModuleEntityManager;
 import com.glooshy.ships.ship.LifecyclePhase;
@@ -60,33 +61,87 @@ public final class ModuleEntityListener implements Listener {
     /**
      * Session-2 cannon interactions:
      * <ul>
-     *   <li>sneak + right-click → sit on the cannon (its seat)</li>
-     *   <li>right-click holding snowballs/fuel → load the cannon</li>
-     *   <li>right-click empty-handed → fire (camera steers within the arc)</li>
+     *   <li>right-click → SIT on the cannon (its seat)</li>
+     *   <li>right-click holding snowballs/fuel while standing outside → quick-load</li>
      * </ul>
+     * While seated: camera steers the barrel (180° arc), right-click fires,
+     * E opens the cannon management UI (cannon + player inventory).
      */
     private void useCannon(Player player, Ship ship, ModulePos pos, ArmorStand stand) {
         ItemStack inHand = player.getInventory().getItemInMainHand();
-        if (player.isSneaking()) {
-            if (!stand.getPassengers().isEmpty()) {
-                player.sendMessage(Component.text(
-                        "This cannon seat is occupied.", NamedTextColor.RED));
-                return;
-            }
-            stand.addPassenger(player);
-            return;
-        }
         if (!inHand.getType().isAir()) {
-            cannons.load(player, ship, pos, inHand);
+            cannons.load(player, ship, pos, inHand); // quick-load while outside
             return;
         }
-        if (ship.phase() != LifecyclePhase.FINALIZED) {
+        if (!stand.getPassengers().isEmpty()) {
             player.sendMessage(Component.text(
+                    "This cannon seat is occupied.", NamedTextColor.RED));
+            return;
+        }
+        stand.addPassenger(player);
+        player.sendMessage(Component.text(
+                "Seated at the cannon. Right-click to fire (aim with camera), "
+                        + "E to manage ammo/fuel, shift to dismount.",
+                NamedTextColor.GRAY));
+    }
+
+    /** The cannon module entity a player is seated at, or null. */
+    private SeatedCannon seatedCannonOf(Player player) {
+        if (!(player.getVehicle() instanceof ArmorStand stand)) {
+            return null;
+        }
+        var binding = moduleEntities.resolve(stand.getUniqueId());
+        if (binding.isEmpty()) {
+            return null;
+        }
+        Optional<Ship> shipOpt = shipRegistry.find(binding.get().shipId());
+        if (shipOpt.isEmpty()
+                || shipOpt.get().modules().get(binding.get().pos()) != ModuleType.CANNON) {
+            return null;
+        }
+        return new SeatedCannon(shipOpt.get(), binding.get().pos(), stand);
+    }
+
+    private record SeatedCannon(Ship ship, ModulePos pos, ArmorStand stand) {
+    }
+
+    /** Seated at the cannon: right-click anywhere fires along the camera aim. */
+    @EventHandler
+    public void onPlayerInteract(@NotNull org.bukkit.event.player.PlayerInteractEvent event) {
+        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_AIR
+                && event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        SeatedCannon cannon = seatedCannonOf(event.getPlayer());
+        if (cannon == null) {
+            return;
+        }
+        event.setCancelled(true);
+        if (cannon.ship().phase() != LifecyclePhase.FINALIZED) {
+            event.getPlayer().sendMessage(Component.text(
                     "Cannons only fire on finalized ships.", NamedTextColor.RED));
             return;
         }
-        cannons.fire(player, ship, pos, stand,
-                pos.localX(ship.size()), pos.localZ(ship.size()));
+        cannons.fire(event.getPlayer(), cannon.ship(), cannon.pos(), cannon.stand(),
+                cannon.pos().localX(cannon.ship().size()),
+                cannon.pos().localZ(cannon.ship().size()));
+    }
+
+    /** Seated at the cannon: E opens the management UI instead of the backpack. */
+    @EventHandler
+    public void onInventoryOpen(@NotNull org.bukkit.event.inventory.InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
+        if (event.getInventory().getHolder() instanceof CannonService.Holder) {
+            return; // our own UI opening — allow
+        }
+        SeatedCannon cannon = seatedCannonOf(player);
+        if (cannon == null) {
+            return;
+        }
+        event.setCancelled(true);
+        cannons.openInventory(player, cannon.ship(), cannon.pos());
     }
 
     @EventHandler
