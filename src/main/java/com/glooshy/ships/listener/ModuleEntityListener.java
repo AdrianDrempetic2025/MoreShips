@@ -81,82 +81,47 @@ public final class ModuleEntityListener implements Listener {
         stand.addPassenger(player);
         player.sendMessage(Component.text(
                 "Seated at the cannon. LEFT-click fires (aim with camera), "
-                        + "F opens ammo/fuel storage, shift dismounts.",
+                        + "the storage below is the cannon's. Shift dismounts.",
                 NamedTextColor.GRAY));
-    }
-
-    /** The cannon module entity a player is seated at, or null. */
-    private SeatedCannon seatedCannonOf(Player player) {
-        if (!(player.getVehicle() instanceof ArmorStand stand)) {
-            return null;
-        }
-        var binding = moduleEntities.resolve(stand.getUniqueId());
-        if (binding.isEmpty()) {
-            return null;
-        }
-        Optional<Ship> shipOpt = shipRegistry.find(binding.get().shipId());
-        if (shipOpt.isEmpty()
-                || shipOpt.get().modules().get(binding.get().pos()) != ModuleType.CANNON) {
-            return null;
-        }
-        return new SeatedCannon(shipOpt.get(), binding.get().pos(), stand);
-    }
-
-    private record SeatedCannon(Ship ship, ModulePos pos, ArmorStand stand) {
+        cannons.openInventory(player, ship, pos);
     }
 
     /**
-     * Seated at the cannon: LEFT-click fires (the swing packet always reaches
-     * the server — right-click AIR with an empty hand sends nothing, which is
-     * why firing "did not work"), F (swap hands) opens the management UI.
+     * Seated at the cannon, LEFT-click fires. While seated the client turns
+     * left-clicks into ATTACK packets against whatever entity sits under the
+     * crosshair (usually the ship), so PlayerInteractEvent never fires —
+     * firing is intercepted from the damage events (here and in
+     * ShipEntityBreakListener) plus the swing fallback below.
      */
     @EventHandler
     public void onPlayerInteract(@NotNull org.bukkit.event.player.PlayerInteractEvent event) {
-        boolean click = event.getAction() != org.bukkit.event.block.Action.PHYSICAL;
-        if (!click) {
+        if (event.getAction() == org.bukkit.event.block.Action.PHYSICAL) {
             return;
         }
-        SeatedCannon cannon = seatedCannonOf(event.getPlayer());
-        if (cannon == null) {
+        trySeatedFire(event.getPlayer());
+    }
+
+    /** Fallback: attacking the cannon/ship entities while seated fires. */
+    private void trySeatedFire(Player player) {
+        var seated = moduleEntities.seatedCannon(player);
+        if (seated.isEmpty()) {
             return;
         }
-        event.setCancelled(true);
-        if (cannon.ship().phase() != LifecyclePhase.FINALIZED) {
-            event.getPlayer().sendMessage(Component.text(
+        Ship ship = shipRegistry.find(seated.get().shipId()).orElse(null);
+        if (ship == null) {
+            return;
+        }
+        if (ship.phase() != LifecyclePhase.FINALIZED) {
+            player.sendMessage(Component.text(
                     "Cannons only fire on finalized ships.", NamedTextColor.RED));
             return;
         }
-        cannons.fire(event.getPlayer(), cannon.ship(), cannon.pos(), cannon.stand(),
-                cannon.pos().localX(cannon.ship().size()),
-                cannon.pos().localZ(cannon.ship().size()));
-    }
-
-    /** Seated at the cannon: F (swap offhand) opens the management UI. */
-    @EventHandler
-    public void onSwapHands(@NotNull org.bukkit.event.player.PlayerSwapHandItemsEvent event) {
-        SeatedCannon cannon = seatedCannonOf(event.getPlayer());
-        if (cannon == null) {
+        if (!(player.getVehicle() instanceof ArmorStand stand)) {
             return;
         }
-        event.setCancelled(true);
-        cannons.openInventory(event.getPlayer(), cannon.ship(), cannon.pos());
-    }
-
-    /** Seated at the cannon: E opens the management UI instead of the backpack. */
-    @EventHandler
-    public void onInventoryOpen(@NotNull org.bukkit.event.inventory.InventoryOpenEvent event) {
-        if (!(event.getPlayer() instanceof Player player)) {
-            return;
-        }
-        if (event.getInventory().getHolder() instanceof CannonService.Holder) {
-            return; // our own UI opening — allow
-        }
-        SeatedCannon cannon = seatedCannonOf(player);
-        if (cannon == null) {
-            return;
-        }
-        event.setCancelled(true);
-        cannons.openInventory(player, cannon.ship(), cannon.pos());
+        cannons.fire(player, ship, seated.get().pos(), stand,
+                seated.get().pos().localX(ship.size()),
+                seated.get().pos().localZ(ship.size()));
     }
 
     @EventHandler
@@ -211,6 +176,12 @@ public final class ModuleEntityListener implements Listener {
         if (!(event instanceof EntityDamageByEntityEvent byEntity)
                 || !(byEntity.getDamager() instanceof Player player)) {
             return; // Only a player punch removes a module
+        }
+
+        // A seated gunner "attacking" (left-click) is FIRING, not punching
+        if (moduleEntities.seatedCannon(player).isPresent()) {
+            trySeatedFire(player);
+            return;
         }
 
         ModulePos pos = binding.get().pos();

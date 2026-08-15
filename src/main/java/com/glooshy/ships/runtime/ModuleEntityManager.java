@@ -79,6 +79,26 @@ public final class ModuleEntityManager {
         return Optional.ofNullable(byEntity.get(entityUuid));
     }
 
+    /**
+     * The cannon module a player is currently SEATED on (their vehicle is the
+     * cannon's module stand), or empty. Shared by the interact/damage
+     * listeners so every seated input path finds the same cannon.
+     */
+    public Optional<ModuleEntityBinding> seatedCannon(org.bukkit.entity.Player player) {
+        if (!(player.getVehicle() instanceof ArmorStand stand)) {
+            return Optional.empty();
+        }
+        ModuleEntityBinding binding = byEntity.get(stand.getUniqueId());
+        if (binding == null) {
+            return Optional.empty();
+        }
+        Ship ship = shipRegistry.find(binding.shipId()).orElse(null);
+        if (ship == null || ship.modules().get(binding.pos()) != ModuleType.CANNON) {
+            return Optional.empty();
+        }
+        return Optional.of(binding);
+    }
+
     /** Spawn the module entity for a newly installed module. */
     public void spawn(Ship ship, ModulePos pos) {
         ModuleType type = ship.modules().get(pos);

@@ -68,6 +68,7 @@ public final class ShipEntityBreakListener implements Listener {
     private final CustomModelVisualManager modelVisuals;
     private final com.glooshy.ships.runtime.ShipDestructionService destructionService;
     private final double arrowDamageFactor;
+    private final com.glooshy.ships.combat.CannonService cannonService;
 
     public ShipEntityBreakListener(
             ShipCoreItem shipCoreItem,
@@ -81,7 +82,8 @@ public final class ShipEntityBreakListener implements Listener {
             ShipRegistry shipRegistry,
             ShipTeardownService teardownService,
             com.glooshy.ships.runtime.ShipDestructionService destructionService,
-            double arrowDamageFactor) {
+            double arrowDamageFactor,
+            com.glooshy.ships.combat.CannonService cannonService) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.cargoService = cargoService;
@@ -94,6 +96,7 @@ public final class ShipEntityBreakListener implements Listener {
         this.teardownService = teardownService;
         this.destructionService = destructionService;
         this.arrowDamageFactor = arrowDamageFactor;
+        this.cannonService = cannonService;
     }
 
     @EventHandler
@@ -108,6 +111,15 @@ public final class ShipEntityBreakListener implements Listener {
             return;
         }
         ArmorStand stand = standOpt.get();
+
+        // A seated gunner left-clicking the ship is FIRING, not attacking it
+        if (event instanceof EntityDamageByEntityEvent byEntityEvent
+                && byEntityEvent.getDamager() instanceof Player attacker
+                && moduleEntities.seatedCannon(attacker).isPresent()) {
+            event.setCancelled(true);
+            fireSeatedCannon(attacker);
+            return;
+        }
 
         // Always cancel — plugin manages HP via the Ship record
         event.setCancelled(true);
@@ -140,6 +152,25 @@ public final class ShipEntityBreakListener implements Listener {
             handleFinalizedDamage(event, stand, ship);
         }
         // DESTROYED ships: shouldn't reach here (entity removed on transition)
+    }
+
+    private void fireSeatedCannon(Player gunner) {
+        var seated = moduleEntities.seatedCannon(gunner);
+        if (seated.isEmpty() || !(gunner.getVehicle() instanceof ArmorStand stand)) {
+            return;
+        }
+        Ship ship = shipRegistry.find(seated.get().shipId()).orElse(null);
+        if (ship == null) {
+            return;
+        }
+        if (ship.phase() != LifecyclePhase.FINALIZED) {
+            gunner.sendMessage(Component.text(
+                    "Cannons only fire on finalized ships.", NamedTextColor.RED));
+            return;
+        }
+        cannonService.fire(gunner, ship, seated.get().pos(), stand,
+                seated.get().pos().localX(ship.size()),
+                seated.get().pos().localZ(ship.size()));
     }
 
     private void handleTeardownableDamage(EntityDamageEvent event, ArmorStand stand, Ship ship) {

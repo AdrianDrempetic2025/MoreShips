@@ -131,7 +131,7 @@ public final class MoreShips extends JavaPlugin {
         ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
                 shipCoreItem, moduleItem, cargoService, moduleEntities,
                 resolver, hitboxes, modelVisuals, bindingRegistry, shipRegistry, teardownService,
-                destructionService, config.combatArrowDamageFactor());
+                destructionService, config.combatArrowDamageFactor(), cannonService);
         getServer().getPluginManager().registerEvents(breakListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
