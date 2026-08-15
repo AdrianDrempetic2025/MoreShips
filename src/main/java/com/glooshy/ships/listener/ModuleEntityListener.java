@@ -80,8 +80,8 @@ public final class ModuleEntityListener implements Listener {
         }
         stand.addPassenger(player);
         player.sendMessage(Component.text(
-                "Seated at the cannon. Right-click fires (aim with camera), "
-                        + "LEFT-click opens ammo/fuel storage, shift dismounts.",
+                "Seated at the cannon. LEFT-click fires (aim with camera), "
+                        + "F opens ammo/fuel storage, shift dismounts.",
                 NamedTextColor.GRAY));
     }
 
@@ -106,17 +106,14 @@ public final class ModuleEntityListener implements Listener {
     }
 
     /**
-     * Seated at the cannon: right-click fires along the camera aim, LEFT-click
-     * opens the management UI (E cannot be intercepted — the client opens the
-     * backpack without telling the server).
+     * Seated at the cannon: LEFT-click fires (the swing packet always reaches
+     * the server — right-click AIR with an empty hand sends nothing, which is
+     * why firing "did not work"), F (swap hands) opens the management UI.
      */
     @EventHandler
     public void onPlayerInteract(@NotNull org.bukkit.event.player.PlayerInteractEvent event) {
-        boolean rightClick = event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR
-                || event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK;
-        boolean leftClick = event.getAction() == org.bukkit.event.block.Action.LEFT_CLICK_AIR
-                || event.getAction() == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK;
-        if (!rightClick && !leftClick) {
+        boolean click = event.getAction() != org.bukkit.event.block.Action.PHYSICAL;
+        if (!click) {
             return;
         }
         SeatedCannon cannon = seatedCannonOf(event.getPlayer());
@@ -124,10 +121,6 @@ public final class ModuleEntityListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        if (leftClick) {
-            cannons.openInventory(event.getPlayer(), cannon.ship(), cannon.pos());
-            return;
-        }
         if (cannon.ship().phase() != LifecyclePhase.FINALIZED) {
             event.getPlayer().sendMessage(Component.text(
                     "Cannons only fire on finalized ships.", NamedTextColor.RED));
@@ -136,6 +129,17 @@ public final class ModuleEntityListener implements Listener {
         cannons.fire(event.getPlayer(), cannon.ship(), cannon.pos(), cannon.stand(),
                 cannon.pos().localX(cannon.ship().size()),
                 cannon.pos().localZ(cannon.ship().size()));
+    }
+
+    /** Seated at the cannon: F (swap offhand) opens the management UI. */
+    @EventHandler
+    public void onSwapHands(@NotNull org.bukkit.event.player.PlayerSwapHandItemsEvent event) {
+        SeatedCannon cannon = seatedCannonOf(event.getPlayer());
+        if (cannon == null) {
+            return;
+        }
+        event.setCancelled(true);
+        cannons.openInventory(event.getPlayer(), cannon.ship(), cannon.pos());
     }
 
     /** Seated at the cannon: E opens the management UI instead of the backpack. */
