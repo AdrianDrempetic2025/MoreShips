@@ -119,6 +119,24 @@ public final class ModuleEntityManager {
      * vanilla material look. Only the worn entity gets the custom model —
      * the module ITEM players hold stays vanilla.
      */
+    /** True when the stand's helmet does not carry the expected worn model. */
+    private static boolean helmetWrong(ArmorStand stand, ModuleType type) {
+        ItemStack helmet = stand.getEquipment().getHelmet();
+        if (helmet == null || helmet.getType().isAir()) {
+            return true;
+        }
+        String expected = switch (type) {
+            case CANNON -> "module_cannon";
+            case SEAT -> "module_seat";
+            default -> null;
+        };
+        if (expected == null) {
+            return false;
+        }
+        var key = helmet.getItemMeta().getItemModel();
+        return key == null || !expected.equals(key.getKey());
+    }
+
     private ItemStack wornVisualOf(ModuleType type) {
         ItemStack stack = moduleItem.create(type);
         String modelKey = switch (type) {
@@ -204,6 +222,13 @@ public final class ModuleEntityManager {
             var entity = uuid == null ? null : Bukkit.getEntity(uuid);
             if (entity == null || entity.isDead()) {
                 continue;
+            }
+            // Heal worn custom models: stands that predate a model change
+            // keep wearing the old vanilla helmet until re-equipped
+            if ((entry.getValue() == ModuleType.CANNON || entry.getValue() == ModuleType.SEAT)
+                    && entity instanceof ArmorStand stand
+                    && helmetWrong(stand, entry.getValue())) {
+                stand.getEquipment().setHelmet(wornVisualOf(entry.getValue()));
             }
             Location target = moduleLocation(base, shipId, entry.getKey());
             // A cannon holding a live aim keeps its barrel pointed there;

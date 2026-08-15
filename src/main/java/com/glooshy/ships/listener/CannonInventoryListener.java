@@ -38,13 +38,13 @@ public final class CannonInventoryListener implements Listener {
         }
     }
 
-    /** Filler slots (9-17) between the cannon and player regions are not a place. */
+    /** Locked slots (row labels + shot counter) are decoration, not storage. */
     @EventHandler
     public void onInventoryClick(@NotNull org.bukkit.event.inventory.InventoryClickEvent event) {
         if (!(event.getInventory().getHolder() instanceof CannonService.Holder)) {
             return;
         }
-        if (CannonService.isFillerSlot(event.getRawSlot())) {
+        if (CannonService.isLockedSlot(event.getRawSlot())) {
             event.setCancelled(true);
         }
     }
@@ -55,7 +55,7 @@ public final class CannonInventoryListener implements Listener {
             return;
         }
         for (int rawSlot : event.getRawSlots()) {
-            if (CannonService.isFillerSlot(rawSlot)) {
+            if (CannonService.isLockedSlot(rawSlot)) {
                 event.setCancelled(true);
                 return;
             }

@@ -7,6 +7,7 @@ import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -206,10 +207,8 @@ public final class CannonService {
             Map<Integer, Map<String, Object>> inv = new LinkedHashMap<>(state.inventory());
             int free = -1;
             for (int slot = 0; slot < CannonState.INVENTORY_SIZE; slot++) {
-                if (!inv.containsKey(slot)) {
-                    if (free < 0) {
-                        free = slot;
-                    }
+                if (!isLockedSlot(slot) && !inv.containsKey(slot) && free < 0) {
+                    free = slot;
                 }
             }
             int amount = stack.getAmount();
@@ -251,72 +250,74 @@ public final class CannonService {
     }
 
     /**
-     * Open the cannon management UI: cannon inventory on top, the player's own
-     * inventory below - loading is plain item dragging between the two.
+     * Open the cannon management UI. Two labelled rows (ammunition + fuel)
+     * plus a live shot counter; the player's own inventory is rendered below
+     * by the client automatically — dragging between the two just works.
      */
     public void openInventory(@NotNull Player player, @NotNull Ship ship, @NotNull ModulePos pos) {
         Inventory inventory = player.getServer().createInventory(
                 new Holder(ship.identity(), pos),
-                54,
-                Component.text("Cannon " + pos.encoded()
-                        + " - snowballs + furnace fuel", NamedTextColor.GOLD));
+                CannonState.INVENTORY_SIZE,
+                Component.text("Cannon " + pos.encoded(), NamedTextColor.GOLD));
         CannonState state = ship.cannons().getOrDefault(pos, CannonState.empty());
-        state.inventory().forEach((slot, itemMap) -> {
-            if (slot < 0 || slot >= CannonState.INVENTORY_SIZE) {
-                return;
+        for (int slot = 0; slot < CannonState.INVENTORY_SIZE; slot++) {
+            if (isLockedSlot(slot)) {
+                continue;
+            }
+            Map<String, Object> itemMap = state.itemAt(slot);
+            if (itemMap == null) {
+                continue;
             }
             ItemStack item = deserializeItem(itemMap);
             if (item != null) {
                 inventory.setItem(slot, item);
             }
-        });
-        ItemStack filler = fillerPane();
-        for (int slot = CannonState.INVENTORY_SIZE; slot < 18; slot++) {
-            inventory.setItem(slot, filler);
         }
-        ItemStack[] playerContents = player.getInventory().getContents();
-        for (int i = 0; i < 36; i++) {
-            ItemStack item = playerContents[i];
-            inventory.setItem(18 + i, item == null ? null : item.clone());
-        }
-        openInventories.computeIfAbsent(ship.identity(), k -> new ConcurrentHashMap<>())
-                .put(pos, inventory);
+        decorate(inventory, state.shots());
         player.openInventory(inventory);
     }
 
-    private static ItemStack fillerPane() {
-        ItemStack pane = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+    /** Locked UI slots: row labels + the shot-counter book. */
+    public static boolean isLockedSlot(int slot) {
+        return slot == SLOT_AMMO_LABEL || slot == SLOT_SHOT_INFO || slot == SLOT_FUEL_LABEL;
+    }
+
+    public static final int SLOT_AMMO_LABEL = 0;
+    public static final int SLOT_SHOT_INFO = 8;
+    public static final int SLOT_FUEL_LABEL = 9;
+
+    /** Lay out the locked decoration of a cannon inventory view. */
+    void decorate(Inventory inventory, int shots) {
+        inventory.setItem(SLOT_AMMO_LABEL, namedPane(
+                Material.SNOW_BLOCK, "Ammunition (snowballs) →", NamedTextColor.AQUA));
+        inventory.setItem(SLOT_FUEL_LABEL, namedPane(
+                Material.COAL_BLOCK, "Fuel (furnace values) →", NamedTextColor.GOLD));
+        ItemStack info = new ItemStack(Material.BOOK);
+        var meta = info.getItemMeta();
+        meta.displayName(Component.text("Charged shots: " + shots, NamedTextColor.YELLOW));
+        meta.lore(List.of(
+                Component.text("1 snowball = 1 shot", NamedTextColor.GRAY),
+                Component.text("Fuel is burned only while firing", NamedTextColor.GRAY),
+                Component.text("Coal = 4 shots, planks = 1", NamedTextColor.GRAY)));
+        info.setItemMeta(meta);
+        inventory.setItem(SLOT_SHOT_INFO, info);
+    }
+
+    private static ItemStack namedPane(Material material, String label, NamedTextColor color) {
+        ItemStack pane = new ItemStack(material);
         var meta = pane.getItemMeta();
-        meta.displayName(Component.text(" ", NamedTextColor.DARK_GRAY));
+        meta.displayName(Component.text(label, color));
         pane.setItemMeta(meta);
         return pane;
     }
 
-    /** Slots 9-17 of the cannon UI (between cannon and player regions). */
-    public static boolean isFillerSlot(int rawSlot) {
-        return rawSlot >= CannonState.INVENTORY_SIZE && rawSlot < 18;
-    }
-
     /** InventoryCloseEvent path: persist the cannon inventory back to the ship. */
     public boolean save(@NotNull Holder holder, @NotNull Inventory inventory, @NotNull Player player) {
-        // Player region writeback: whatever ended up in slots 18-53 IS the
-        // player's inventory now (items may have been shuffled between regions)
-        if (inventory.getSize() >= 54) {
-            for (int i2 = 0; i2 < 36; i2++) {
-                player.getInventory().setItem(i2, inventory.getItem(18 + i2));
-            }
-            // Items that slipped into filler slots (shift-click quirks) go back too
-            for (int slot = CannonState.INVENTORY_SIZE; slot < 18; slot++) {
-                ItemStack stranded = inventory.getItem(slot);
-                if (stranded != null && !stranded.getType().isAir()
-                        && stranded.getType() != Material.GRAY_STAINED_GLASS_PANE) {
-                    player.getInventory().addItem(stranded);
-                    inventory.setItem(slot, null);
-                }
-            }
-        }
         Map<Integer, Map<String, Object>> contents = new HashMap<>();
         for (int slot = 0; slot < CannonState.INVENTORY_SIZE; slot++) {
+            if (isLockedSlot(slot)) {
+                continue; // labels + shot counter are ours, not cargo
+            }
             ItemStack item = inventory.getItem(slot);
             if (item == null || item.getType().isAir()) {
                 continue;
@@ -362,6 +363,7 @@ public final class CannonService {
         for (Map.Entry<ModulePos, Inventory> entry : open.entrySet()) {
             Inventory inv = entry.getValue();
             for (int slot = 0; slot < Math.min(inv.getSize(), CannonState.INVENTORY_SIZE); slot++) {
+                if (isLockedSlot(slot)) continue;
                 ItemStack item = inv.getItem(slot);
                 if (item != null && !item.getType().isAir()) {
                     dropAt.getWorld().dropItemNaturally(dropAt, item);

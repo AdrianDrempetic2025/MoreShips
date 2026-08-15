@@ -13,7 +13,8 @@ import java.util.Map;
  */
 public record CannonState(int shots, Map<Integer, Map<String, Object>> inventory) {
 
-    public static final int INVENTORY_SIZE = 9;
+    /** UI: 2 rows — ammo row + fuel row, with locked label/info slots. */
+    public static final int INVENTORY_SIZE = 18;
 
     public CannonState {
         if (shots < 0) {
