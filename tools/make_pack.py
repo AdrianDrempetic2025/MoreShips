@@ -21,6 +21,10 @@ SIZES = {
 
 # name -> length stretch factor (relative to the small model's 3-block spec)
 STRETCH_Z = {"small": 1.0, "medium": 4.0 / 3.0, "large": 8.0 / 3.0}
+# Jan's eye calibration: medium/large render 2 blocks wide, should be 3
+WIDTH_BOOST = {"small": 1.0, "medium": 1.5, "large": 1.5}
+# Large should be ~2 blocks longer than its stretched length
+EXTRA_Z = {"small": 1.0, "medium": 1.0, "large": 1.14}
 
 # Worn module models (Session 2): the module ENTITY wears these as its helmet;
 # the inventory item stays vanilla. The artist's display settings are kept —
@@ -87,12 +91,14 @@ def main():
         # within Minecraft's [-16, 32] limit or the client rejects the whole
         # model (ERROR block).
         sc = 2.0 * min(2 * 16.0 / w_px, 3 * 16.0 / l_px)  # small-ship calibration
-        sz = sc * STRETCH_Z[size]                          # length stretch
+        wb = WIDTH_BOOST[size]
+        sz = sc * STRETCH_Z[size] * wb * EXTRA_Z[size]     # length (eye-tuned)
+        sx = sc * wb                                        # width/height
         whole["display"] = {"head": {
-            "translation": [round(sc * (8 - cx), 3), round(sc * (8 - ymin) - 32, 3),
+            "translation": [round(sx * (8 - cx), 3), round(sx * (8 - ymin) - 32, 3),
                             round(sz * (8 - cz), 3)],
             "rotation": [0, 0, 0],
-            "scale": [round(sc, 4), round(sc, 4), round(sz, 4)],
+            "scale": [round(sx, 4), round(sx, 4), round(sz, 4)],
         }}
         trim = whole
         if not trim["elements"]:
