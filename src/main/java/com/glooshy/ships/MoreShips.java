@@ -247,8 +247,11 @@ public final class MoreShips extends JavaPlugin {
         }
         for (com.glooshy.ships.item.RecipeCatalog.Entry entry
                 : com.glooshy.ships.item.RecipeCatalog.entries(cores, modules, cannonballs)) {
+            // NamespacedKey only allows [a-z0-9._-] - slug the title
+            String slug = entry.title().toLowerCase()
+                    .replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
             org.bukkit.inventory.ShapedRecipe recipe =
-                    new org.bukkit.inventory.ShapedRecipe(key(entry.title()), entry.result());
+                    new org.bukkit.inventory.ShapedRecipe(key(slug), entry.result());
             recipe.shape(entry.shape());
             entry.ingredients().forEach(recipe::setIngredient);
             getServer().addRecipe(recipe);
