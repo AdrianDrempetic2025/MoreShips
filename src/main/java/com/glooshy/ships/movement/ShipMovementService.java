@@ -87,6 +87,8 @@ public final class ShipMovementService implements Runnable {
     private long tickCounter;
     /** Orphan sweep cadence (ticks). */
     private static final long SWEEP_INTERVAL = 100L;
+    /** Last HP label pushed to a controller stand (avoids per-tick churn). */
+    private final Map<ShipIdentity, String> lastHpLabels = new ConcurrentHashMap<>();
 
     public ShipMovementService(
             @NotNull JavaPlugin plugin,
@@ -162,6 +164,32 @@ public final class ShipMovementService implements Runnable {
         movements.clear();
     }
 
+    /** Fleet hull colliders, computed ONCE per tick:
+     *  {worldId, x, z, halfWidth, 0, 0, shipHash}. Turns per-ship collision
+     *  checks from O(fleet) entity lookups into a flat array scan. */
+    private double[][] fleetColliders(List<RuntimeBinding> snapshot) {
+        double[][] out = new double[snapshot.size()][];
+        int i = 0;
+        for (RuntimeBinding other : snapshot) {
+            Entity otherEntity = Bukkit.getEntity(other.entityUuid());
+            if (otherEntity == null || otherEntity.isDead()) {
+                continue;
+            }
+            Ship otherShip = shipRegistry.find(other.shipId()).orElse(null);
+            if (otherShip == null || otherEntity.getWorld() == null) {
+                continue;
+            }
+            Location otherLoc = otherEntity.getLocation();
+            out[i++] = new double[] {
+                    System.identityHashCode(otherEntity.getWorld()),
+                    otherLoc.getX(), otherLoc.getZ(),
+                    otherShip.size().hitboxWidth() / 2.0,
+                    0, 0,
+                    other.shipId().encoded().hashCode()};
+        }
+        return java.util.Arrays.copyOf(out, i);
+    }
+
     @Override
     public void run() {
         tickCounter++;
@@ -172,6 +200,7 @@ public final class ShipMovementService implements Runnable {
         } catch (ConcurrentModificationException e) {
             return;
         }
+        double[][] fleet = fleetColliders(snapshot);
 
         for (RuntimeBinding binding : snapshot) {
             ShipIdentity shipId = binding.shipId();
@@ -197,21 +226,22 @@ public final class ShipMovementService implements Runnable {
             if (entity instanceof org.bukkit.entity.LivingEntity living && living.isCollidable()) {
                 living.setCollidable(false); // the solid deck must not push the controller
             }
-            if (entity instanceof org.bukkit.entity.ArmorStand stand) {
-                if (ship.maxHp() > 0) {
-                    // HP-only nametag (updated on damage; healed here if stale)
-                    if (!stand.isCustomNameVisible()
-                            || !stand.getCustomName().equals(
-                                    net.kyori.adventure.text.Component.text(
-                                            ship.currentHp() + "/" + ship.maxHp() + " HP",
-                                            net.kyori.adventure.text.format.NamedTextColor.AQUA))) {
+            // Meta reads (helmet/name healing) are not free - stagger them:
+            // each ship is healed once every 20 ticks
+            boolean metaHeal = (tickCounter + entity.getUniqueId().hashCode()) % 20 == 0;
+            if (entity instanceof org.bukkit.entity.ArmorStand stand && metaHeal) {
+                String label = ship.maxHp() > 0
+                        ? ship.currentHp() + "/" + ship.maxHp() + " HP" : null;
+                String cached = label == null ? "" : label;
+                String last = lastHpLabels.put(shipId, cached);
+                if (last == null || !last.equals(cached)) {
+                    if (label == null) {
+                        stand.setCustomNameVisible(false);
+                    } else {
                         stand.customName(net.kyori.adventure.text.Component.text(
-                                ship.currentHp() + "/" + ship.maxHp() + " HP",
-                                net.kyori.adventure.text.format.NamedTextColor.AQUA));
+                                label, net.kyori.adventure.text.format.NamedTextColor.AQUA));
                         stand.setCustomNameVisible(true);
                     }
-                } else if (stand.isCustomNameVisible()) {
-                    stand.setCustomNameVisible(false); // no tag before the hull exists
                 }
                 if (stand.isGlowing()) {
                     stand.setGlowing(false); // heal pre-0.14 stands
@@ -260,12 +290,14 @@ public final class ShipMovementService implements Runnable {
                 }
 
                 movement.tick();
-                applyVelocity(entity, ship, movement.currentSpeed());
+                applyVelocity(entity, ship, movement.currentSpeed(), fleet,
+                        System.identityHashCode(entity.getWorld()));
             } else {
                 // Unfinished / hull-applied ships: no propulsion, but they
                 // still sit in the world — vertical physics applies.
                 movements.remove(shipId);
-                applyVelocity(entity, ship, 0.0);
+                applyVelocity(entity, ship, 0.0, fleet,
+                        System.identityHashCode(entity.getWorld()));
             }
 
             // Module entities hold their slot positions; hitbox + hull visuals ride along.
@@ -405,7 +437,8 @@ public final class ShipMovementService implements Runnable {
      * into one velocity applied this tick. We own the full velocity vector —
      * vanilla gravity accumulation is overridden every tick.
      */
-    private void applyVelocity(@NotNull Entity shipEntity, Ship ship, double forwardSpeed) {
+    private void applyVelocity(@NotNull Entity shipEntity, Ship ship, double forwardSpeed,
+                               double[][] fleet, int worldId) {
         Location loc = shipEntity.getLocation();
         double yawRad = Math.toRadians(loc.getYaw());
         double dx = -Math.sin(yawRad) * forwardSpeed;
@@ -416,8 +449,9 @@ public final class ShipMovementService implements Runnable {
                 : null;
         if (collision != null && (dx != 0.0 || dz != 0.0)) {
             CollisionBox box = collision;
-            List<double[]> otherShips = otherShipColliders(
-                    ship.identity(), ship.size(), loc);
+            List<double[]> otherShips = nearbyColliders(
+                    fleet, worldId, loc, ship.identity().encoded().hashCode(),
+                    ship.size().hitboxWidth() / 2.0);
             double[] clamped = box.clampMovement(
                     loc.getX(), loc.getZ(), dx, dz,
                     (x, z) -> collidesAt(box, shipEntity, loc.getY(), x, z)
@@ -476,41 +510,40 @@ public final class ShipMovementService implements Runnable {
         return false;
     }
 
-    /**
-     * Hull colliders of every OTHER ship near a position: {centerX, centerZ,
-     * combinedRadius}. Radius is the other hull's half-span plus ours.
-     */
-    private List<double[]> otherShipColliders(ShipIdentity self, com.glooshy.ships.ship.ShipSize size,
-                                              Location near) {
+    /** Flat scan of the per-tick fleet array: {centerX, centerZ,
+     *  combinedRadius} for ships in the same world within reach. */
+    private static List<double[]> nearbyColliders(double[][] fleet, int worldId, Location near,
+                                                  int selfHash, double myHalf) {
         List<double[]> colliders = new java.util.ArrayList<>();
-        double myHalf = size.hitboxWidth() / 2.0;
-        for (RuntimeBinding other : bindingRegistry.snapshot()) {
-            if (other.shipId().equals(self)) {
+        double nx = near.getX();
+        double nz = near.getZ();
+        for (double[] c : fleet) {
+            if ((int) c[0] != worldId || (int) c[6] == selfHash) {
                 continue;
             }
-            Ship otherShip = shipRegistry.find(other.shipId()).orElse(null);
-            if (otherShip == null) {
+            double dx = c[1] - nx;
+            double dz = c[2] - nz;
+            if (dx * dx + dz * dz > 32 * 32) {
                 continue;
             }
-            Entity otherEntity = Bukkit.getEntity(other.entityUuid());
-            if (otherEntity == null || otherEntity.isDead()) {
-                continue;
-            }
-            Location otherLoc = otherEntity.getLocation();
-            if (otherLoc.getWorld() == null || otherLoc.getWorld() != near.getWorld()) {
-                continue;
-            }
-            if (otherLoc.distanceSquared(near) > 32 * 32) {
-                continue;
-            }
-            colliders.add(new double[] {
-                    otherLoc.getX(), otherLoc.getZ(),
-                    myHalf + otherShip.size().hitboxWidth() / 2.0});
+            colliders.add(new double[] {c[1], c[2], myHalf + c[3]});
         }
         return colliders;
     }
 
     private static boolean collidesWithOtherShip(List<double[]> colliders, double x, double z) {
+        for (double[] c : colliders) {
+            double ddx = x - c[0];
+            double ddz = z - c[1];
+            if (ddx * ddx + ddz * ddz < c[2] * c[2]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Terrain collision testthOtherShip(List<double[]> colliders, double x, double z) {
         for (double[] c : colliders) {
             double ddx = x - c[0];
             double ddz = z - c[1];

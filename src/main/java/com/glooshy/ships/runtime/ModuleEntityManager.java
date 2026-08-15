@@ -51,6 +51,7 @@ public final class ModuleEntityManager {
 
     private final Map<UUID, ModuleEntityBinding> byEntity = new ConcurrentHashMap<>();
     private final Map<ShipIdentity, Map<ModulePos, UUID>> byShip = new ConcurrentHashMap<>();
+    private long followTicks;
 
     public ModuleEntityManager(NamespacedKey shipIdKey,
                                NamespacedKey slotKey,
@@ -208,6 +209,7 @@ public final class ModuleEntityManager {
      * every tick for FINALIZED ships — also repairs dead/missing entities.
      */
     public void follow(ShipIdentity shipId) {
+        followTicks++;
         Location base = shipLocation(shipId);
         if (base == null) {
             return;
@@ -254,9 +256,11 @@ public final class ModuleEntityManager {
             if (entity == null || entity.isDead()) {
                 continue;
             }
-            // Heal worn custom models: stands that predate a model change
-            // keep wearing the old vanilla helmet until re-equipped
-            if ((entry.getValue() == ModuleType.CANNON || entry.getValue() == ModuleType.SEAT)
+            // Heal worn custom models: meta reads are not free, so only once
+            // every 20 ticks (staggered per ship)
+            boolean metaHeal = (followTicks + shipId.encoded().hashCode()) % 20 == 0;
+            if (metaHeal
+                    && (entry.getValue() == ModuleType.CANNON || entry.getValue() == ModuleType.SEAT)
                     && entity instanceof ArmorStand stand
                     && helmetWrong(stand, entry.getValue())) {
                 stand.getEquipment().setHelmet(wornVisualOf(entry.getValue()));
