@@ -67,10 +67,6 @@ public final class CannonService {
     /** Barrel holds an aim this long after the last shot, then rests. */
     private static final long AIM_GRACE_MILLIS = 1500L;
 
-    private static final float HALF_ARC_DEGREES = 90.0f;
-    private static final float MIN_PITCH = -45.0f;
-    private static final float MAX_PITCH = 15.0f;
-
     private final ShipRegistry shipRegistry;
     private final NamespacedKey cannonMarker;
     private final double damage;
@@ -113,15 +109,11 @@ public final class CannonService {
             return false;
         }
 
-        // Resting direction: outward from the ship's center through this
-        // module's hull grid position, rotated by the ship's yaw
-        double outwardYaw = outwardYawDeg(stand.getLocation().getYaw(), localX, localZ);
-
-        // ONE aim calculation — feeds the barrel visual AND the projectile
-        float cameraYaw = shooter.getEyeLocation().getYaw();
-        float aimYaw = CannonAimTracker.clampToArc(cameraYaw, (float) outwardYaw, HALF_ARC_DEGREES);
-        float aimPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH,
-                shooter.getEyeLocation().getPitch()));
+        // ONE source of truth: fire EXACTLY where the barrel points. The
+        // barrel's live rotation IS the (clamped) aim — the seated gunner's
+        // camera steers it in ModuleEntityManager.follow().
+        float aimYaw = stand.getLocation().getYaw();
+        float aimPitch = stand.getLocation().getPitch();
 
         // Ammo/fuel economy — atomic on the registry's compute
         String[] abort = {null};
@@ -154,13 +146,15 @@ public final class CannonService {
         CannonState after = updated.cannons().getOrDefault(pos, CannonState.empty());
         lastFired.put(key, now);
 
-        // Projectile along the SAME aim the barrel shows
+        // Projectile along the barrel, a good punch stronger; gravity stays
+        // on so the shot keeps a (now flatter) arc
+        double shotSpeed = speed * 1.6;
         double yawRad = Math.toRadians(aimYaw);
         double pitchRad = Math.toRadians(aimPitch);
-        double horizontal = Math.cos(pitchRad) * speed;
+        double horizontal = Math.cos(pitchRad) * shotSpeed;
         Vector velocity = new Vector(
                 -Math.sin(yawRad) * horizontal,
-                -Math.sin(pitchRad) * speed,
+                -Math.sin(pitchRad) * shotSpeed,
                 Math.cos(yawRad) * horizontal);
 
         Location muzzle = stand.getLocation().clone().add(
@@ -174,9 +168,6 @@ public final class CannonService {
                     cannonMarker, PersistentDataType.STRING, ship.identity().encoded());
         });
 
-        // Barrel visual: rotate the module stand to the aim; it rides back to
-        // resting alignment once the aim expires (ModuleEntityManager).
-        stand.setRotation(aimYaw, aimPitch);
         aimTracker.set(ship.identity(), pos, aimYaw, aimPitch,
                 now + cooldownMillis + AIM_GRACE_MILLIS);
 

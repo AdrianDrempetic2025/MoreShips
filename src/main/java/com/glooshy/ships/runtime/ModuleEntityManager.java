@@ -323,7 +323,8 @@ public final class ModuleEntityManager {
         }
         ShipSize size = shipOpt.get().size();
         double[] offset = ModulePos.worldOffset(base.getYaw(), pos.localX(size), pos.localZ(size));
-        Location loc = base.clone().add(offset[0], 0.35, offset[1]);
+        // Modules ride half a block above the shulker floor (Session 2)
+        Location loc = base.clone().add(offset[0], -0.25, offset[1]);
         loc.setYaw(base.getYaw());
         loc.setPitch(0f);
         return loc;
