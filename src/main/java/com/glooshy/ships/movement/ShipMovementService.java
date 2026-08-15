@@ -193,6 +193,21 @@ public final class ShipMovementService implements Runnable {
                 living.setCollidable(false); // the solid deck must not push the controller
             }
             if (entity instanceof org.bukkit.entity.ArmorStand stand) {
+                if (ship.maxHp() > 0) {
+                    // HP-only nametag (updated on damage; healed here if stale)
+                    if (!stand.isCustomNameVisible()
+                            || !stand.getCustomName().equals(
+                                    net.kyori.adventure.text.Component.text(
+                                            ship.currentHp() + "/" + ship.maxHp() + " HP",
+                                            net.kyori.adventure.text.format.NamedTextColor.AQUA))) {
+                        stand.customName(net.kyori.adventure.text.Component.text(
+                                ship.currentHp() + "/" + ship.maxHp() + " HP",
+                                net.kyori.adventure.text.format.NamedTextColor.AQUA));
+                        stand.setCustomNameVisible(true);
+                    }
+                } else if (stand.isCustomNameVisible()) {
+                    stand.setCustomNameVisible(false); // no tag before the hull exists
+                }
                 if (stand.isGlowing()) {
                     stand.setGlowing(false); // heal pre-0.14 stands
                 }
@@ -320,9 +335,9 @@ public final class ShipMovementService implements Runnable {
         if (dash > 0) {
             shortId = shortId.substring(0, dash);
         }
-        final String label = ship.phase() == LifecyclePhase.FINALIZED
-                ? "Ship " + shortId + " [" + ship.currentHp() + "/" + ship.maxHp() + " HP]"
-                : "Unfinished Ship " + shortId;
+        final String label = ship.maxHp() > 0
+                ? ship.currentHp() + "/" + ship.maxHp() + " HP"
+                : null;
         org.bukkit.entity.ArmorStand stand = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, as -> {
             as.setVisible(false);
             as.setSmall(true);
@@ -331,9 +346,11 @@ public final class ShipMovementService implements Runnable {
             as.setGlowing(false);
             as.getEquipment().setHelmet(
                     com.glooshy.ships.item.ShipModelHelmet.create(ship.size()));
-            as.setCustomNameVisible(true);
-            as.customName(net.kyori.adventure.text.Component.text(
-                    label, net.kyori.adventure.text.format.NamedTextColor.AQUA));
+            as.setCustomNameVisible(label != null);
+            if (label != null) {
+                as.customName(net.kyori.adventure.text.Component.text(
+                        label, net.kyori.adventure.text.format.NamedTextColor.AQUA));
+            }
             as.getPersistentDataContainer().set(
                     shipIdKey, org.bukkit.persistence.PersistentDataType.STRING, shipId.encoded());
             if (ship.hullMaterial() != null) {

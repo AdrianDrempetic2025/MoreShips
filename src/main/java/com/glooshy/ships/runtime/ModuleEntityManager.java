@@ -121,8 +121,6 @@ public final class ModuleEntityManager {
             as.setMarker(false);
             as.setBasePlate(false);
             as.setRemoveWhenFarAway(false);
-            as.customName(Component.text(moduleItem.displayName(type), NamedTextColor.GOLD));
-            as.setCustomNameVisible(true);
             as.getEquipment().setHelmet(wornVisualOf(type));
             as.getPersistentDataContainer().set(shipIdKey, PersistentDataType.STRING,
                     shipId.encoded());

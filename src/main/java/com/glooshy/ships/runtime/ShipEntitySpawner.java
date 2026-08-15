@@ -51,9 +51,6 @@ public final class ShipEntitySpawner {
             as.setCollidable(false); // the solid deck must not push the controller
             as.setGlowing(false);
             as.getEquipment().setHelmet(com.glooshy.ships.item.ShipModelHelmet.create(size));
-            as.customName(Component.text(
-                    ENTITY_LABEL + " " + shortId(shipId), NamedTextColor.AQUA));
-            as.setCustomNameVisible(true);
             as.getPersistentDataContainer().set(
                     shipIdKey, PersistentDataType.STRING, shipId.encoded());
         });

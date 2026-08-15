@@ -92,13 +92,17 @@ def main():
         # model (ERROR block).
         sc = 2.0 * min(2 * 16.0 / w_px, 3 * 16.0 / l_px)  # small-ship calibration
         wb = WIDTH_BOOST[size]
-        sz = sc * STRETCH_Z[size] * wb * EXTRA_Z[size]     # length (eye-tuned)
-        sx = sc * wb                                        # width/height
+        if size == "large":
+            # default height, 5 wide, 10 long (small renders ~2x3, so /2 *target)
+            sx, sy, sz = sc * 2.5, sc, sc * (10.0 / 3.0)
+        else:
+            sx = sy = sc * wb
+            sz = sc * STRETCH_Z[size] * wb
         whole["display"] = {"head": {
-            "translation": [round(sx * (8 - cx), 3), round(sx * (8 - ymin) - 32, 3),
+            "translation": [round(sx * (8 - cx), 3), round(sy * (8 - ymin) - 32, 3),
                             round(sz * (8 - cz), 3)],
             "rotation": [0, 0, 0],
-            "scale": [round(sx, 4), round(sx, 4), round(sz, 4)],
+            "scale": [round(sx, 4), round(sy, 4), round(sz, 4)],
         }}
         trim = whole
         if not trim["elements"]:

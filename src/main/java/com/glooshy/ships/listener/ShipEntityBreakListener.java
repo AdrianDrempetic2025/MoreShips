@@ -234,8 +234,7 @@ public final class ShipEntityBreakListener implements Listener {
 
         // Update entity name to show HP
         stand.customName(Component.text(
-                "Ship " + shortId(ship.identity()) + " [" + after.currentHp()
-                        + "/" + after.maxHp() + " HP]",
+                after.currentHp() + "/" + after.maxHp() + " HP",
                 NamedTextColor.AQUA));
     }
 
