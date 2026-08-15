@@ -80,8 +80,8 @@ public final class ModuleEntityListener implements Listener {
         }
         stand.addPassenger(player);
         player.sendMessage(Component.text(
-                "Seated at the cannon. Right-click to fire (aim with camera), "
-                        + "E to manage ammo/fuel, shift to dismount.",
+                "Seated at the cannon. Right-click fires (aim with camera), "
+                        + "LEFT-click opens ammo/fuel storage, shift dismounts.",
                 NamedTextColor.GRAY));
     }
 
@@ -105,11 +105,18 @@ public final class ModuleEntityListener implements Listener {
     private record SeatedCannon(Ship ship, ModulePos pos, ArmorStand stand) {
     }
 
-    /** Seated at the cannon: right-click anywhere fires along the camera aim. */
+    /**
+     * Seated at the cannon: right-click fires along the camera aim, LEFT-click
+     * opens the management UI (E cannot be intercepted — the client opens the
+     * backpack without telling the server).
+     */
     @EventHandler
     public void onPlayerInteract(@NotNull org.bukkit.event.player.PlayerInteractEvent event) {
-        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_AIR
-                && event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+        boolean rightClick = event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR
+                || event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK;
+        boolean leftClick = event.getAction() == org.bukkit.event.block.Action.LEFT_CLICK_AIR
+                || event.getAction() == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK;
+        if (!rightClick && !leftClick) {
             return;
         }
         SeatedCannon cannon = seatedCannonOf(event.getPlayer());
@@ -117,6 +124,10 @@ public final class ModuleEntityListener implements Listener {
             return;
         }
         event.setCancelled(true);
+        if (leftClick) {
+            cannons.openInventory(event.getPlayer(), cannon.ship(), cannon.pos());
+            return;
+        }
         if (cannon.ship().phase() != LifecyclePhase.FINALIZED) {
             event.getPlayer().sendMessage(Component.text(
                     "Cannons only fire on finalized ships.", NamedTextColor.RED));

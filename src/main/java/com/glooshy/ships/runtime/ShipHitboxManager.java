@@ -145,7 +145,7 @@ public final class ShipHitboxManager {
         cells.add(HullShape.centerCell()); // deck cell under the controller stand
         for (HullShape.Cell cell : cells) {
             Location loc = localToWorld(base, cell.localX(), cell.localZ())
-                    .add(0.0, height / 2.0 - 0.5, 0.0);
+                    .add(0.0, height / 2.0 - 1.0, 0.0); // Session 2: shulker floor half a block lower
             Shulker solid = base.getWorld().spawn(loc, Shulker.class, sh -> {
                 sh.setAI(false);
                 sh.setGravity(false);
@@ -181,7 +181,7 @@ public final class ShipHitboxManager {
             } else {
                 HullShape.Cell cell = cells.get(i - segments);
                 target = localToWorld(base, cell.localX(), cell.localZ())
-                        .add(0.0, height / 2.0 - 0.5, 0.0);
+                        .add(0.0, height / 2.0 - 1.0, 0.0); // Session 2: shulker floor half a block lower
             }
             Location current = entity.getLocation();
             if (current.distanceSquared(target) > 0.01) {

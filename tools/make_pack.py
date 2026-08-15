@@ -16,6 +16,15 @@ SIZES = {
     # add medium/large here as models arrive
 }
 
+# Worn module models (Session 2): the module ENTITY wears these as its helmet;
+# the inventory item stays vanilla. The artist's display settings are kept —
+# unlike the ship hull, these head transforms were authored deliberately.
+MODULES = {
+    # item-model key: (model json, texture, source texture_size)
+    "module_cannon": ("cannon_module.json", "cannon_module.png", 128),
+    "module_seat": ("seat_module.json", "seat_module.png", 32),
+}
+
 def main():
     pack = os.path.join(ROOT, "build", "pack")
     if os.path.isdir(pack):
@@ -84,6 +93,32 @@ def main():
         json.dump({"model": {"type": "minecraft:model", "model": f"moreships:item/{item_model}"}},
                   open(os.path.join(pack, "assets/moreships/items", f"{item_model}.json"), "w"))
         print(f"{size}: {len(trim['elements'])} trim cubes")
+
+    for key, (model, texture, tex_size) in MODULES.items():
+        src = os.path.join(ROOT, "assets", "modules", model)
+        if not os.path.exists(src):
+            print(f"skip module {key}: {src} missing")
+            continue
+        m = json.load(open(src, encoding="utf-8"))
+        tex_ref = f"moreships:item/{os.path.splitext(texture)[0]}"
+        baked = {
+            "credit": m.get("credit", ""),
+            "texture_size": [tex_size, tex_size],
+            "textures": {"0": tex_ref, "particle": tex_ref},
+            "elements": [],
+            "display": m.get("display", {}),
+        }
+        for el in m["elements"]:
+            for face in el.get("faces", {}).values():
+                face["texture"] = "#0"
+            baked["elements"].append(el)
+        json.dump(baked, open(os.path.join(
+            pack, "assets/moreships/models/item", f"{key}.json"), "w"), indent=1)
+        shutil.copy(os.path.join(ROOT, "assets", "modules", texture),
+                    os.path.join(pack, "assets/moreships/textures/item", texture))
+        json.dump({"model": {"type": "minecraft:model", "model": f"moreships:item/{key}"}},
+                  open(os.path.join(pack, "assets/moreships/items", f"{key}.json"), "w"))
+        print(f"module {key}: {len(baked['elements'])} cubes")
 
     out = os.path.join(ROOT, "build", "libs", "MoreShips-pack.zip")
     os.makedirs(os.path.dirname(out), exist_ok=True)

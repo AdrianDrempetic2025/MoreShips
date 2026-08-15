@@ -19,6 +19,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 
@@ -102,7 +103,7 @@ public final class ModuleEntityManager {
             as.setRemoveWhenFarAway(false);
             as.customName(Component.text(moduleItem.displayName(type), NamedTextColor.GOLD));
             as.setCustomNameVisible(true);
-            as.getEquipment().setHelmet(moduleItem.create(type));
+            as.getEquipment().setHelmet(wornVisualOf(type));
             as.getPersistentDataContainer().set(shipIdKey, PersistentDataType.STRING,
                     shipId.encoded());
             as.getPersistentDataContainer().set(slotKey, PersistentDataType.STRING, pos.encoded());
@@ -110,6 +111,27 @@ public final class ModuleEntityManager {
         byEntity.put(stand.getUniqueId(), new ModuleEntityBinding(shipId, pos, stand.getUniqueId()));
         byShip.computeIfAbsent(shipId, k -> new ConcurrentHashMap<>()).put(pos, stand.getUniqueId());
         return stand;
+    }
+
+    /**
+     * The helmet the module entity WEARS: CANNON and SEAT use Jan's custom
+     * worn models from the resource pack; every other module keeps the
+     * vanilla material look. Only the worn entity gets the custom model —
+     * the module ITEM players hold stays vanilla.
+     */
+    private ItemStack wornVisualOf(ModuleType type) {
+        ItemStack stack = moduleItem.create(type);
+        String modelKey = switch (type) {
+            case CANNON -> "module_cannon";
+            case SEAT -> "module_seat";
+            default -> null;
+        };
+        if (modelKey != null) {
+            var meta = stack.getItemMeta();
+            meta.setItemModel(new org.bukkit.NamespacedKey("moreships", modelKey));
+            stack.setItemMeta(meta);
+        }
+        return stack;
     }
 
     /** Remove the module entity (module removed / moved). */
