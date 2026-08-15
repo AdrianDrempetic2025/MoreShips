@@ -220,18 +220,16 @@ public final class CannonService {
             } else {
                 // No free slot — top up the first partial same-type stack
                 for (int slot = 0; slot < CannonState.INVENTORY_SIZE && amount > loaded[0]; slot++) {
-                    Map<String, Object> item = inv.get(slot);
-                    if (item == null || !stack.getType().name().equals(item.get("type"))) {
+                    ItemStack existing = deserializeItem(inv.get(slot));
+                    if (existing == null || !existing.isSimilar(stack)) {
                         continue;
                     }
-                    int have = ((Number) item.getOrDefault("amount", 1)).intValue();
-                    int take = Math.min(amount, 64 - have);
+                    int take = Math.min(amount, 64 - existing.getAmount());
                     if (take <= 0) {
                         continue;
                     }
-                    Map<String, Object> copy = new LinkedHashMap<>(item);
-                    copy.put("amount", have + take);
-                    inv.put(slot, copy);
+                    existing.setAmount(existing.getAmount() + take);
+                    inv.put(slot, existing.serialize());
                     loaded[0] += take;
                 }
             }
@@ -402,7 +400,10 @@ public final class CannonService {
         lastFired.keySet().removeIf(k -> k.startsWith(shipId.encoded() + "|"));
     }
 
-    public ItemStack deserializeItem(Map<String, Object> itemMap) {
+    public static ItemStack deserializeItem(Map<String, Object> itemMap) {
+        if (itemMap == null) {
+            return null;
+        }
         try {
             return ItemStack.deserialize(itemMap);
         } catch (IllegalArgumentException | IllegalStateException e) {
@@ -430,25 +431,20 @@ public final class CannonService {
     }
 
     private static Material materialAt(CannonState state, int slot) {
-        Map<String, Object> item = state.itemAt(slot);
-        if (item == null || !(item.get("type") instanceof String typeName)) {
-            return null;
-        }
-        return Material.matchMaterial(typeName);
+        ItemStack item = deserializeItem(state.itemAt(slot));
+        return item == null ? null : item.getType();
     }
 
     /** Remove ONE item from a slot (decrement or delete). */
     private static CannonState consumeAt(CannonState state, int slot) {
-        Map<String, Object> item = state.itemAt(slot);
+        ItemStack item = deserializeItem(state.itemAt(slot));
         if (item == null) {
             return state;
         }
         Map<Integer, Map<String, Object>> inv = new LinkedHashMap<>(state.inventory());
-        int amount = ((Number) item.getOrDefault("amount", 1)).intValue();
-        if (amount > 1) {
-            Map<String, Object> copy = new LinkedHashMap<>(item);
-            copy.put("amount", amount - 1);
-            inv.put(slot, copy);
+        if (item.getAmount() > 1) {
+            item.setAmount(item.getAmount() - 1);
+            inv.put(slot, item.serialize());
         } else {
             inv.remove(slot);
         }
