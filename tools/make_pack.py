@@ -13,8 +13,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZES = {
     # name: (model, texture, item-model, target_w_blocks, target_l_blocks)
     "small": ("small_ship_hull.json", "small_ship.png", "ship_small_trim", 2, 3),
-    # add medium/large here as models arrive
+    # Session 2: medium/large are the small model stretched along its length
+    # (Jan: "just stretched out") until dedicated models arrive.
+    "medium": ("small_ship_hull.json", "small_ship.png", "ship_medium_trim", 3, 4),
+    "large": ("small_ship_hull.json", "small_ship.png", "ship_large_trim", 3, 8),
 }
+
+# name -> length stretch factor (relative to the small model's 3-block spec)
+STRETCH_Z = {"small": 1.0, "medium": 4.0 / 3.0, "large": 8.0 / 3.0}
 
 # Worn module models (Session 2): the module ENTITY wears these as its helmet;
 # the inventory item stays vanilla. The artist's display settings are kept —
@@ -39,9 +45,21 @@ def main():
     for size, (model, texture, item_model, tw, tl) in SIZES.items():
         src = os.path.join(ROOT, "assets", size, model)
         if not os.path.exists(src):
+            # stretched variants share the small source model
+            src = os.path.join(ROOT, "assets", "small", model)
+        if not os.path.exists(src):
             print(f"skip {size}: {src} missing")
             continue
         m = json.load(open(src, encoding="utf-8"))
+        # Stretch the model along Z (length) for bigger hulls
+        factor = STRETCH_Z[size]
+        if factor != 1.0:
+            for el in m["elements"]:
+                el["from"][2] = round(el["from"][2] * factor, 4)
+                el["to"][2] = round(el["to"][2] * factor, 4)
+                rot = el.get("rotation")
+                if rot and "origin" in rot:
+                    rot["origin"][2] = round(rot["origin"][2] * factor, 4)
         tex_ref = f"moreships:item/{os.path.splitext(texture)[0]}"
         # Bake the WHOLE model (all cubes). Faces the artist left untextured
         # (#missing) get the artist's texture too — one rigid client-rendered
@@ -86,8 +104,10 @@ def main():
             continue
         json.dump(trim, open(os.path.join(
             pack, "assets/moreships/models/item", f"{item_model}.json"), "w"), indent=1)
-        shutil.copy(os.path.join(ROOT, "assets", size, texture),
-                    os.path.join(pack, "assets/moreships/textures/item", texture))
+        tex_src = os.path.join(ROOT, "assets", size, texture)
+        if not os.path.exists(tex_src):
+            tex_src = os.path.join(ROOT, "assets", "small", texture)
+        shutil.copy(tex_src, os.path.join(pack, "assets/moreships/textures/item", texture))
         # 26.x requires the namespaced type "minecraft:model" — bare "model"
         # (the 1.21.4 shorthand) silently fails to resolve client-side
         json.dump({"model": {"type": "minecraft:model", "model": f"moreships:item/{item_model}"}},
@@ -119,6 +139,24 @@ def main():
         json.dump({"model": {"type": "minecraft:model", "model": f"moreships:item/{key}"}},
                   open(os.path.join(pack, "assets/moreships/items", f"{key}.json"), "w"))
         print(f"module {key}: {len(baked['elements'])} cubes")
+
+    # Cannonball item model: a small ball skinned with the vanilla blackstone
+    # texture (no artist asset needed)
+    ball = {
+        "credit": "MoreShips",
+        "texture_size": [16, 16],
+        "textures": {"0": "minecraft:block/blackstone", "particle": "minecraft:block/blackstone"},
+        "elements": [{
+            "from": [4, 4, 4], "to": [12, 12, 12],
+            "faces": {f: {"uv": [0, 0, 8, 8], "texture": "#0"}
+                      for f in ("north", "east", "south", "west", "up", "down")},
+        }],
+    }
+    json.dump(ball, open(os.path.join(
+        pack, "assets/moreships/models/item", "cannonball.json"), "w"), indent=1)
+    json.dump({"model": {"type": "minecraft:model", "model": "moreships:item/cannonball"}},
+              open(os.path.join(pack, "assets/moreships/items", "cannonball.json"), "w"))
+    print("cannonball model baked")
 
     out = os.path.join(ROOT, "build", "libs", "MoreShips-pack.zip")
     os.makedirs(os.path.dirname(out), exist_ok=True)

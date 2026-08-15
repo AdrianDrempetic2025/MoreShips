@@ -6,6 +6,7 @@ import com.glooshy.ships.config.MoreShipsConfig;
 import com.glooshy.ships.hull.HpCalculator;
 import com.glooshy.ships.hull.HullValidator;
 import com.glooshy.ships.identity.ShipIdentityGenerator;
+import com.glooshy.ships.item.CannonballItem;
 import com.glooshy.ships.item.ModuleItem;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.listener.CargoInventoryListener;
@@ -120,9 +121,13 @@ public final class MoreShips extends JavaPlugin {
         getServer().getPluginManager().registerEvents(placementListener, this);
 
         org.bukkit.NamespacedKey cannonMarker = new org.bukkit.NamespacedKey(this, "cannon_shot");
+        com.glooshy.ships.item.CannonballItem cannonballItem =
+                new com.glooshy.ships.item.CannonballItem(
+                        new NamespacedKey(this, "cannonball_marker"));
         com.glooshy.ships.combat.CannonService cannonService = new com.glooshy.ships.combat.CannonService(
                 shipRegistry, cannonMarker,
-                config.cannonDamage(), config.cannonCooldownMillis(), config.cannonSpeed(), cannonAims);
+                config.cannonDamage(), config.cannonCooldownMillis(), config.cannonSpeed(),
+                cannonAims, cannonballItem);
         com.glooshy.ships.runtime.ShipDestructionService destructionService =
                 new com.glooshy.ships.runtime.ShipDestructionService(
                         shipRegistry, bindingRegistry, moduleEntities, hitboxes, modelVisuals,
@@ -149,7 +154,7 @@ public final class MoreShips extends JavaPlugin {
                 new com.glooshy.ships.listener.CannonHitListener(cannonService, resolver, destructionService), this);
 
         getServer().getPluginManager().registerEvents(
-                new com.glooshy.ships.listener.RecipeBookListener(shipCoreItem, moduleItem), this);
+                new com.glooshy.ships.listener.RecipeBookListener(shipCoreItem, moduleItem, cannonballItem), this);
 
         getServer().getPluginManager().registerEvents(
                 new CargoInventoryListener(cargoService), this);
@@ -203,11 +208,11 @@ public final class MoreShips extends JavaPlugin {
             getLogger().info("Movement disabled in config.");
         }
 
-        registerRecipes(shipCoreItem, moduleItem, config.recipesEnabled());
+        registerRecipes(shipCoreItem, moduleItem, cannonballItem, config.recipesEnabled());
 
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener,
-                cargoService, moduleEntities, resolver, modelVisuals, this, cannonService);
+                cargoService, moduleEntities, resolver, modelVisuals, this, cannonService, cannonballItem);
         PluginCommand command = getCommand("moreships");
         if (command != null) {
             command.setExecutor(shipsCommand);
@@ -233,69 +238,27 @@ public final class MoreShips extends JavaPlugin {
      * Cores: iron+sticks / 3 small+iron+wood / 2 medium+stick. Modules:
      * simple material recipes. Disable with recipes.enabled=false.
      */
-    private void registerRecipes(ShipCoreItem cores, ModuleItem modules, boolean enabled) {
+    /** Registered straight from the RecipeCatalog — one source of truth. */
+    private void registerRecipes(ShipCoreItem cores, ModuleItem modules,
+                                 CannonballItem cannonballs, boolean enabled) {
         if (!enabled) {
             getLogger().info("Crafting recipes disabled in config.");
             return;
         }
-
-        addRecipeWithItems(key("small_core"), cores.create(ShipSize.SMALL),
-                new String[]{"ISI"},
-                Map.of('I', new ItemStack(Material.IRON_INGOT),
-                        'S', new ItemStack(Material.STICK)));
-        addRecipeWithItems(key("medium_core"), cores.create(ShipSize.MEDIUM),
-                new String[]{"WIW", "SSS", "WIW"},
-                Map.of('W', new ItemStack(Material.OAK_PLANKS),
-                        'I', new ItemStack(Material.IRON_INGOT),
-                        'S', cores.create(ShipSize.SMALL)));
-        addRecipeWithItems(key("large_core"), cores.create(ShipSize.LARGE),
-                new String[]{"MMS"},
-                Map.of('M', cores.create(ShipSize.MEDIUM),
-                        'S', new ItemStack(Material.STICK)));
-
-        addRecipe(key("seat_module"), modules.create(ModuleType.SEAT), "PPP",
-                Map.of('P', Material.OAK_PLANKS));
-        addRecipe(key("cargo_module"), modules.create(ModuleType.CARGO),
-                new String[]{"PPP", "PCP", "PPP"},
-                Map.of('P', Material.OAK_PLANKS, 'C', Material.CHEST));
-        addRecipe(key("cannon_module"), modules.create(ModuleType.CANNON),
-                new String[]{"III", "IFI", "III"},
-                Map.of('I', Material.IRON_INGOT, 'F', Material.FIRE_CHARGE));
-        addRecipe(key("engine_module"), modules.create(ModuleType.ENGINE), "IRI",
-                Map.of('I', Material.IRON_INGOT, 'R', Material.REDSTONE));
-        addRecipe(key("health_module"), modules.create(ModuleType.HEALTH),
-                new String[]{"III", "IGI", "III"},
-                Map.of('I', Material.IRON_INGOT, 'G', Material.GOLDEN_APPLE));
-
-        getLogger().info("Crafting recipes registered (8).");
+        for (com.glooshy.ships.item.RecipeCatalog.Entry entry
+                : com.glooshy.ships.item.RecipeCatalog.entries(cores, modules, cannonballs)) {
+            org.bukkit.inventory.ShapedRecipe recipe =
+                    new org.bukkit.inventory.ShapedRecipe(key(entry.title()), entry.result());
+            recipe.shape(entry.shape());
+            entry.ingredients().forEach(recipe::setIngredient);
+            getServer().addRecipe(recipe);
+        }
+        getLogger().info("Crafting recipes registered ("
+                + com.glooshy.ships.item.RecipeCatalog.entries(cores, modules, cannonballs).size() + ").");
     }
 
     private NamespacedKey key(String name) {
         return new NamespacedKey(this, name);
-    }
-
-    private void addRecipe(NamespacedKey id, ItemStack result, String shape,
-                           Map<Character, Material> ingredients) {
-        addRecipe(id, result, new String[]{shape}, ingredients);
-    }
-
-    private void addRecipe(NamespacedKey id, ItemStack result, String[] shape,
-                           Map<Character, Material> ingredients) {
-        org.bukkit.inventory.ShapedRecipe recipe =
-                new org.bukkit.inventory.ShapedRecipe(id, result);
-        recipe.shape(shape);
-        ingredients.forEach(recipe::setIngredient);
-        getServer().addRecipe(recipe);
-    }
-
-    /** Recipe whose ingredients are exact items (cores as ingredients). */
-    private void addRecipeWithItems(NamespacedKey id, ItemStack result, String[] shape,
-                                    Map<Character, ItemStack> ingredients) {
-        org.bukkit.inventory.ShapedRecipe recipe =
-                new org.bukkit.inventory.ShapedRecipe(id, result);
-        recipe.shape(shape);
-        ingredients.forEach(recipe::setIngredient);
-        getServer().addRecipe(recipe);
     }
 
     private void loadPersistedState() {

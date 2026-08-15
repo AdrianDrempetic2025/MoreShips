@@ -38,7 +38,8 @@ public final class ShipEntitySpawner {
         this.shipModelItem = shipModelItem;
     }
 
-    public UUID spawnUnfinishedShip(Location location, ShipIdentity shipId) {
+    public UUID spawnUnfinishedShip(Location location, ShipIdentity shipId,
+                                   com.glooshy.ships.ship.ShipSize size) {
         // Session 2: the controller rides half a block LOWER than the deck —
         // its head (model attach + pilot seat) sits level with the shulker
         // floor. The deck-following managers compensate with +0.5.
@@ -49,7 +50,7 @@ public final class ShipEntitySpawner {
             as.setGravity(true);
             as.setCollidable(false); // the solid deck must not push the controller
             as.setGlowing(false);
-            as.getEquipment().setHelmet(com.glooshy.ships.item.ShipModelHelmet.create(shipModelItem));
+            as.getEquipment().setHelmet(com.glooshy.ships.item.ShipModelHelmet.create(size));
             as.customName(Component.text(
                     ENTITY_LABEL + " " + shortId(shipId), NamedTextColor.AQUA));
             as.setCustomNameVisible(true);

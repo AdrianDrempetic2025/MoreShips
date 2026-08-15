@@ -98,7 +98,7 @@ public final class ShipCorePlacementListener implements Listener {
         Ship ship = shipRegistry.createShip(coreSize);
 
         Location spawnLoc = target.getLocation().add(spawnOffsetX, spawnOffsetY, spawnOffsetZ);
-        UUID entityUuid = entitySpawner.spawnUnfinishedShip(spawnLoc, ship.identity());
+        UUID entityUuid = entitySpawner.spawnUnfinishedShip(spawnLoc, ship.identity(), ship.size());
 
         bindingRegistry.bind(RuntimeBinding.active(ship.identity(), entityUuid));
 

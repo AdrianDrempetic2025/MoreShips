@@ -78,15 +78,19 @@ public final class CannonService {
     private final Map<ShipIdentity, Map<ModulePos, Inventory>> openInventories =
             new ConcurrentHashMap<>();
 
+    private final com.glooshy.ships.item.CannonballItem cannonballs;
+
     public CannonService(ShipRegistry shipRegistry, NamespacedKey cannonMarker,
                          double damage, long cooldownMillis, double speed,
-                         CannonAimTracker aimTracker) {
+                         CannonAimTracker aimTracker,
+                         com.glooshy.ships.item.CannonballItem cannonballs) {
         this.shipRegistry = shipRegistry;
         this.cannonMarker = cannonMarker;
         this.damage = damage;
         this.cooldownMillis = cooldownMillis;
         this.speed = speed;
         this.aimTracker = aimTracker;
+        this.cannonballs = cannonballs;
     }
 
     public CannonAimTracker aimTracker() {
@@ -118,10 +122,10 @@ public final class CannonService {
         // Ammo/fuel economy — atomic on the registry's compute
         String[] abort = {null};
         Ship updated = shipRegistry.mutateCannon(ship.identity(), pos, state -> {
-            int ammoSlot = firstSlotWith(state, AMMO_MATERIAL);
+            int ammoSlot = firstCannonballSlot(state);
             if (ammoSlot < 0) {
-                abort[0] = "No ammunition (" + AMMO_MATERIAL.name() + ") in the cannon. "
-                        + "Right-click it with snowballs to load.";
+                abort[0] = "No cannonballs in the cannon. "
+                        + "Craft them (4 blackstone + 1 iron) and load them in.";
                 return state;
             }
             int shots = state.shots();
@@ -159,7 +163,7 @@ public final class CannonService {
 
         Location muzzle = stand.getLocation().clone().add(
                 velocity.clone().normalize().multiply(0.6)).add(0, 0.4, 0);
-        muzzle.getWorld().spawn(muzzle, Snowball.class, sb -> {
+        Snowball shot = muzzle.getWorld().spawn(muzzle, Snowball.class, sb -> {
             sb.setVelocity(velocity);
             sb.setShooter(shooter);
             sb.setGravity(true);
@@ -167,6 +171,16 @@ public final class CannonService {
             sb.getPersistentDataContainer().set(
                     cannonMarker, PersistentDataType.STRING, ship.identity().encoded());
         });
+        // The visible cannonball: an item display riding the projectile
+        org.bukkit.entity.ItemDisplay ball = muzzle.getWorld().spawn(
+                muzzle, org.bukkit.entity.ItemDisplay.class, display -> {
+                    display.setItemStack(cannonballs.create(1));
+                    display.setItemDisplayTransform(
+                            org.bukkit.entity.ItemDisplay.ItemDisplayTransform.HEAD);
+                    display.setPersistent(false);
+                    display.setTeleportDuration(1);
+                    shot.addPassenger(display);
+                });
 
         aimTracker.set(ship.identity(), pos, aimYaw, aimPitch,
                 now + cooldownMillis + AIM_GRACE_MILLIS);
@@ -189,7 +203,7 @@ public final class CannonService {
     /** Right-click with fuel/ammo in hand: load the stack into the cannon. */
     public void load(@NotNull Player player, @NotNull Ship ship, @NotNull ModulePos pos,
                      @NotNull ItemStack stack) {
-        boolean ammo = stack.getType() == AMMO_MATERIAL;
+        boolean ammo = cannonballs.isCannonball(stack);
         if (!ammo && !CannonFuels.isFuel(stack.getType())) {
             return;
         }
@@ -234,7 +248,7 @@ public final class CannonService {
         stack.setAmount(stack.getAmount() - loaded[0]);
         player.getInventory().setItemInMainHand(stack.getAmount() > 0 ? stack : null);
         player.sendMessage(Component.text(
-                "Loaded " + loaded[0] + " " + (ammo ? "snowball(s)" : "fuel") + ".",
+                "Loaded " + loaded[0] + " " + (ammo ? "cannonball(s)" : "fuel") + ".",
                 NamedTextColor.GREEN));
     }
 
@@ -278,14 +292,14 @@ public final class CannonService {
     /** Lay out the locked decoration of a cannon inventory view. */
     void decorate(Inventory inventory, int shots) {
         inventory.setItem(SLOT_AMMO_LABEL, namedPane(
-                Material.SNOW_BLOCK, "Ammunition (snowballs) →", NamedTextColor.AQUA));
+                Material.SNOW_BLOCK, "Cannonballs →", NamedTextColor.AQUA));
         inventory.setItem(SLOT_FUEL_LABEL, namedPane(
                 Material.COAL_BLOCK, "Fuel (furnace values) →", NamedTextColor.GOLD));
         ItemStack info = new ItemStack(Material.BOOK);
         var meta = info.getItemMeta();
         meta.displayName(Component.text("Charged shots: " + shots, NamedTextColor.YELLOW));
         meta.lore(List.of(
-                Component.text("1 snowball = 1 shot", NamedTextColor.GRAY),
+                Component.text("1 cannonball = 1 shot", NamedTextColor.GRAY),
                 Component.text("Fuel is burned only while firing", NamedTextColor.GRAY),
                 Component.text("Coal = 4 shots, planks = 1", NamedTextColor.GRAY)));
         info.setItemMeta(meta);
@@ -311,7 +325,7 @@ public final class CannonService {
             if (item == null || item.getType().isAir()) {
                 continue;
             }
-            if (item.getType() != AMMO_MATERIAL && !CannonFuels.isFuel(item.getType())) {
+            if (!cannonballs.isCannonball(item) && !CannonFuels.isFuel(item.getType())) {
                 // Not ammo/fuel — hand it back instead of storing
                 player.getWorld().dropItemNaturally(player.getLocation(), item);
                 continue;
@@ -402,9 +416,10 @@ public final class CannonService {
         }
     }
 
-    private static int firstSlotWith(CannonState state, Material material) {
+    private int firstCannonballSlot(CannonState state) {
         for (int slot = 0; slot < CannonState.INVENTORY_SIZE; slot++) {
-            if (materialAt(state, slot) == material) {
+            ItemStack item = deserializeItem(state.itemAt(slot));
+            if (cannonballs.isCannonball(item)) {
                 return slot;
             }
         }
@@ -414,7 +429,7 @@ public final class CannonService {
     private static int firstFuelSlot(CannonState state) {
         for (int slot = 0; slot < CannonState.INVENTORY_SIZE; slot++) {
             Material mat = materialAt(state, slot);
-            if (mat != null && mat != AMMO_MATERIAL && CannonFuels.isFuel(mat)) {
+            if (mat != null && CannonFuels.isFuel(mat) && mat != Material.SNOWBALL) {
                 return slot;
             }
         }

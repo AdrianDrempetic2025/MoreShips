@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.glooshy"
-version = "0.40.0-alpha"
+version = "0.41.0-alpha"
 
 repositories {
     mavenCentral()

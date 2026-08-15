@@ -58,6 +58,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
     private final CustomModelVisualManager modelVisuals;
     private final org.bukkit.plugin.java.JavaPlugin plugin;
     private final com.glooshy.ships.combat.CannonService cannons;
+    private final com.glooshy.ships.item.CannonballItem cannonballs;
 
     public ShipsCommand(ShipCoreItem shipCoreItem,
                         ModuleItem moduleItem,
@@ -69,8 +70,10 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                         ShipEntityResolver resolver,
                         CustomModelVisualManager modelVisuals,
                         org.bukkit.plugin.java.JavaPlugin plugin,
-                        com.glooshy.ships.combat.CannonService cannons) {
+                        com.glooshy.ships.combat.CannonService cannons,
+                        com.glooshy.ships.item.CannonballItem cannonballs) {
         this.cannons = cannons;
+        this.cannonballs = cannonballs;
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.shipRegistry = shipRegistry;
@@ -408,7 +411,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Only players can open the recipe book.", NamedTextColor.RED));
             return;
         }
-        new com.glooshy.ships.ui.RecipeBookUi(shipCoreItem, moduleItem).open(player, 0);
+        new com.glooshy.ships.ui.RecipeBookUi(shipCoreItem, moduleItem, cannonballs).open(player, 0);
     }
 
     private void handleDebug(CommandSender sender) {

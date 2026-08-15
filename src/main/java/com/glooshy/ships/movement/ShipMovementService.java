@@ -203,9 +203,9 @@ public final class ShipMovementService implements Runnable {
                     stand.setSmall(true); // lower passenger seat
                 }
                 if (!com.glooshy.ships.item.ShipModelHelmet.isShipModel(
-                        stand.getEquipment().getHelmet(), modelItemKey)) {
+                        stand.getEquipment().getHelmet(), ship.size())) {
                     stand.getEquipment().setHelmet(
-                            com.glooshy.ships.item.ShipModelHelmet.create(modelItemKey));
+                            com.glooshy.ships.item.ShipModelHelmet.create(ship.size()));
                 }
             }
 
@@ -330,7 +330,7 @@ public final class ShipMovementService implements Runnable {
             as.setCollidable(false);
             as.setGlowing(false);
             as.getEquipment().setHelmet(
-                    com.glooshy.ships.item.ShipModelHelmet.create(modelItemKey));
+                    com.glooshy.ships.item.ShipModelHelmet.create(ship.size()));
             as.setCustomNameVisible(true);
             as.customName(net.kyori.adventure.text.Component.text(
                     label, net.kyori.adventure.text.format.NamedTextColor.AQUA));

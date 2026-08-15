@@ -27,10 +27,13 @@ public final class RecipeBookUi {
 
     private final ShipCoreItem cores;
     private final ModuleItem modules;
+    private final com.glooshy.ships.item.CannonballItem cannonballs;
 
-    public RecipeBookUi(ShipCoreItem cores, ModuleItem modules) {
+    public RecipeBookUi(ShipCoreItem cores, ModuleItem modules,
+                        com.glooshy.ships.item.CannonballItem cannonballs) {
         this.cores = cores;
         this.modules = modules;
+        this.cannonballs = cannonballs;
     }
 
     public static final class Holder implements InventoryHolder {
@@ -47,7 +50,7 @@ public final class RecipeBookUi {
     }
 
     public void open(Player player, int page) {
-        List<RecipeCatalog.Entry> entries = RecipeCatalog.entries(cores, modules);
+        List<RecipeCatalog.Entry> entries = RecipeCatalog.entries(cores, modules, cannonballs);
         int pages = (entries.size() + RECIPES_PER_PAGE - 1) / RECIPES_PER_PAGE;
         page = Math.max(0, Math.min(page, pages - 1));
 

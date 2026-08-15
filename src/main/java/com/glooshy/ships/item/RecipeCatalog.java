@@ -20,30 +20,36 @@ public final class RecipeCatalog {
                         ItemStack result) {
     }
 
-    public static List<Entry> entries(ShipCoreItem cores, ModuleItem modules) {
+    /**
+     * Session-2 intuitive recipes: a clear progression — cores are a rare
+     * center item framed by a material ring, the seat is boat-shaped, the
+     * engine is an iron ring around a redstone block, and cannonballs are
+     * blackstone around iron.
+     */
+    public static List<Entry> entries(ShipCoreItem cores, ModuleItem modules,
+                                      CannonballItem cannonballs) {
         List<Entry> list = new ArrayList<>();
 
         list.add(new Entry("Small Ship Core",
-                new String[]{"ISI"},
+                new String[]{" I ", "IHI", " I "},
                 Map.of('I', new ItemStack(Material.IRON_INGOT),
-                        'S', new ItemStack(Material.STICK)),
+                        'H', new ItemStack(Material.HEART_OF_THE_SEA)),
                 cores.create(ShipSize.SMALL)));
 
         list.add(new Entry("Medium Ship Core",
-                new String[]{"WIW", "SSS", "WIW"},
-                Map.of('W', new ItemStack(Material.OAK_PLANKS),
-                        'I', new ItemStack(Material.IRON_INGOT),
+                new String[]{"PPP", "PSP", "PPP"},
+                Map.of('P', new ItemStack(Material.OAK_PLANKS),
                         'S', cores.create(ShipSize.SMALL)),
                 cores.create(ShipSize.MEDIUM)));
 
         list.add(new Entry("Large Ship Core",
-                new String[]{"MMS"},
-                Map.of('M', cores.create(ShipSize.MEDIUM),
-                        'S', new ItemStack(Material.STICK)),
+                new String[]{"III", "IMI", "III"},
+                Map.of('I', new ItemStack(Material.IRON_INGOT),
+                        'M', cores.create(ShipSize.MEDIUM)),
                 cores.create(ShipSize.LARGE)));
 
         list.add(new Entry("Seat Module",
-                new String[]{"PPP"},
+                new String[]{"PPP", "P P"},
                 Map.of('P', new ItemStack(Material.OAK_PLANKS)),
                 modules.create(ModuleType.SEAT)));
 
@@ -60,9 +66,9 @@ public final class RecipeCatalog {
                 modules.create(ModuleType.CANNON)));
 
         list.add(new Entry("Engine Module",
-                new String[]{"IRI"},
+                new String[]{"III", "IRI", "III"},
                 Map.of('I', new ItemStack(Material.IRON_INGOT),
-                        'R', new ItemStack(Material.REDSTONE)),
+                        'R', new ItemStack(Material.REDSTONE_BLOCK)),
                 modules.create(ModuleType.ENGINE)));
 
         list.add(new Entry("Health Module",
@@ -70,6 +76,12 @@ public final class RecipeCatalog {
                 Map.of('I', new ItemStack(Material.IRON_INGOT),
                         'G', new ItemStack(Material.GOLDEN_APPLE)),
                 modules.create(ModuleType.HEALTH)));
+
+        list.add(new Entry("Cannonball x8",
+                new String[]{" B ", "BIB", " B "},
+                Map.of('B', new ItemStack(Material.BLACKSTONE),
+                        'I', new ItemStack(Material.IRON_INGOT)),
+                cannonballs.create(8)));
 
         return list;
     }
