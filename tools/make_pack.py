@@ -93,8 +93,12 @@ def main():
         sc = 2.0 * min(2 * 16.0 / w_px, 3 * 16.0 / l_px)  # small-ship calibration
         wb = WIDTH_BOOST[size]
         if size == "large":
-            # default height, 5 wide, 12 long
-            sx, sy, sz = sc * 2.5, sc, sc * (12.0 / 3.0)
+            # default height, 5 wide, 14 long
+            sx, sy, sz = sc * 2.5, sc, sc * (14.0 / 3.0)
+        elif size == "medium":
+            # 3 wide, a touch taller than small, 4-block-spec length
+            sx, sy = sc * 1.5, sc * 1.1
+            sz = sc * STRETCH_Z[size] * wb
         else:
             sx = sy = sc * wb
             sz = sc * STRETCH_Z[size] * wb
