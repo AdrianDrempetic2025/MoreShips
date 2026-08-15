@@ -51,15 +51,6 @@ def main():
             print(f"skip {size}: {src} missing")
             continue
         m = json.load(open(src, encoding="utf-8"))
-        # Stretch the model along Z (length) for bigger hulls
-        factor = STRETCH_Z[size]
-        if factor != 1.0:
-            for el in m["elements"]:
-                el["from"][2] = round(el["from"][2] * factor, 4)
-                el["to"][2] = round(el["to"][2] * factor, 4)
-                rot = el.get("rotation")
-                if rot and "origin" in rot:
-                    rot["origin"][2] = round(rot["origin"][2] * factor, 4)
         tex_ref = f"moreships:item/{os.path.splitext(texture)[0]}"
         # Bake the WHOLE model (all cubes). Faces the artist left untextured
         # (#missing) get the artist's texture too — one rigid client-rendered
@@ -91,12 +82,17 @@ def main():
         w_px = max(xs) - min(xs)
         l_px = max(zs) - min(zs)
         # Artist calibration: spec-footprint fit read too small in world;
-        # final scale is 2x that fit, per Jan's eye
-        sc = 2.0 * min(tw * 16.0 / w_px, tl * 16.0 / l_px)
+        # final scale is 2x that fit, per Jan's eye. Bigger hulls STRETCH in
+        # display.scale (z axis) — element coordinates themselves must stay
+        # within Minecraft's [-16, 32] limit or the client rejects the whole
+        # model (ERROR block).
+        sc = 2.0 * min(2 * 16.0 / w_px, 3 * 16.0 / l_px)  # small-ship calibration
+        sz = sc * STRETCH_Z[size]                          # length stretch
         whole["display"] = {"head": {
-            "translation": [round(sc * (8 - cx), 3), round(sc * (8 - ymin) - 32, 3), round(sc * (8 - cz), 3)],
+            "translation": [round(sc * (8 - cx), 3), round(sc * (8 - ymin) - 32, 3),
+                            round(sz * (8 - cz), 3)],
             "rotation": [0, 0, 0],
-            "scale": [round(sc, 4), round(sc, 4), round(sc, 4)],
+            "scale": [round(sc, 4), round(sc, 4), round(sz, 4)],
         }}
         trim = whole
         if not trim["elements"]:

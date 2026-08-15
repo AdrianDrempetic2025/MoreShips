@@ -31,9 +31,9 @@ public final class RecipeCatalog {
         List<Entry> list = new ArrayList<>();
 
         list.add(new Entry("Small Ship Core",
-                new String[]{" I ", "IHI", " I "},
+                new String[]{"III", "P P", "PPP"},
                 Map.of('I', new ItemStack(Material.IRON_INGOT),
-                        'H', new ItemStack(Material.HEART_OF_THE_SEA)),
+                        'P', new ItemStack(Material.OAK_PLANKS)),
                 cores.create(ShipSize.SMALL)));
 
         list.add(new Entry("Medium Ship Core",

@@ -140,7 +140,7 @@ public final class MoreShips extends JavaPlugin {
         getServer().getPluginManager().registerEvents(breakListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
-                shipRegistry, resolver, hullValidator);
+                shipRegistry, resolver, hullValidator, moduleItem, shipCoreItem);
         getServer().getPluginManager().registerEvents(hullListener, this);
 
         getServer().getPluginManager().registerEvents(
@@ -158,6 +158,9 @@ public final class MoreShips extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(
                 new CargoInventoryListener(cargoService), this);
+        getServer().getPluginManager().registerEvents(
+                new com.glooshy.ships.listener.ItemPlacementGuardListener(
+                        moduleItem, shipCoreItem), this);
         getServer().getPluginManager().registerEvents(
                 new com.glooshy.ships.listener.CannonInventoryListener(cannonService), this);
 

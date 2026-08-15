@@ -33,14 +33,20 @@ public final class HullApplicationListener implements Listener {
     private final ShipRegistry shipRegistry;
     private final ShipEntityResolver resolver;
     private final HullValidator hullValidator;
+    private final com.glooshy.ships.item.ModuleItem moduleItem;
+    private final com.glooshy.ships.item.ShipCoreItem coreItem;
 
     public HullApplicationListener(
             ShipRegistry shipRegistry,
             ShipEntityResolver resolver,
-            HullValidator hullValidator) {
+            HullValidator hullValidator,
+            com.glooshy.ships.item.ModuleItem moduleItem,
+            com.glooshy.ships.item.ShipCoreItem coreItem) {
         this.shipRegistry = shipRegistry;
         this.resolver = resolver;
         this.hullValidator = hullValidator;
+        this.moduleItem = moduleItem;
+        this.coreItem = coreItem;
     }
 
     @EventHandler
@@ -79,6 +85,14 @@ public final class HullApplicationListener implements Listener {
             player.sendMessage(Component.text(
                     "Right-click with a block to apply hull material.",
                     NamedTextColor.GRAY));
+            return;
+        }
+        // Modules and ship cores are never valid hull material (they are
+        // block-shaped items and would otherwise be consumed as one)
+        if (moduleItem.parse(inHand).isPresent() || coreItem.parseSize(inHand) != null) {
+            player.sendMessage(Component.text(
+                    "Modules and ship cores cannot be used as hull material.",
+                    NamedTextColor.RED));
             return;
         }
 
