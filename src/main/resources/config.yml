@@ -80,6 +80,12 @@ modules:
   cannon:
     material: DISPENSER
     displayName: "Cannon Module"
+  engine:
+    material: FURNACE
+    displayName: "Engine Module"
+  health:
+    material: GOLDEN_APPLE
+    displayName: "Health Module"
 
 ship:
   # Physical hitbox (Interaction entity) size around the ship controller,
@@ -104,7 +110,8 @@ collision:
 resourcepack:
   # Custom hull models need the MoreShips resource pack on clients. The plugin
   # pushes this URL to every player on join. Empty = no pack pushed.
-  url: "http://192.168.1.12:8765/MoreShips-pack.zip"
+  # Public permanent URL - the GitHub release always carries the newest pack.
+  url: https://github.com/AdrianDrempetic2025/MoreShips/releases/latest/download/MoreShips-pack.zip
 
 cannons:
   # Damage one cannon shot deals to another ship's HP.
@@ -138,10 +145,3 @@ combat:
   # Session 2: arrows deal this fraction of their normal damage to ships.
   arrowDamageFactor: 0.75
 
-modules:
-  engine:
-    material: FURNACE
-    displayName: "Engine Module"
-  health:
-    material: GOLDEN_APPLE
-    displayName: "Health Module"

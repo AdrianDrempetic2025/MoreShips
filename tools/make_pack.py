@@ -93,8 +93,8 @@ def main():
         sc = 2.0 * min(2 * 16.0 / w_px, 3 * 16.0 / l_px)  # small-ship calibration
         wb = WIDTH_BOOST[size]
         if size == "large":
-            # default height, 5 wide, 10 long (small renders ~2x3, so /2 *target)
-            sx, sy, sz = sc * 2.5, sc, sc * (10.0 / 3.0)
+            # default height, 5 wide, 12 long
+            sx, sy, sz = sc * 2.5, sc, sc * (12.0 / 3.0)
         else:
             sx = sy = sc * wb
             sz = sc * STRETCH_Z[size] * wb

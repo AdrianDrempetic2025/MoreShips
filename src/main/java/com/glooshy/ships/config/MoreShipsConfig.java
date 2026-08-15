@@ -141,7 +141,7 @@ public final class MoreShipsConfig {
      * an empty default would silently disable the pack push entirely.
      */
     private static final String DEFAULT_PACK_URL =
-            "http://192.168.1.12:8765/MoreShips-pack.zip";
+            "https://github.com/AdrianDrempetic2025/MoreShips/releases/latest/download/MoreShips-pack.zip";
 
     public String resourcePackUrl() {
         return config.getString("resourcepack.url", DEFAULT_PACK_URL);
