@@ -76,6 +76,11 @@ public final class ShipMovementService implements Runnable {
     private final double weightPerModule;
     private final double engineBoost;
     private final double hardnessPenalty;
+    private final double engineAccelBoost;
+    private final double engineHardCap;
+    private final double smallSpeedFactor;
+    private final double mediumSpeedFactor;
+    private final double largeSpeedFactor;
 
     private final Map<ShipIdentity, ShipMovement> movements = new ConcurrentHashMap<>();
     private volatile BukkitTask task;
@@ -99,7 +104,12 @@ public final class ShipMovementService implements Runnable {
             double turnRateDeg,
             double weightPerModule,
             double engineBoost,
-            double hardnessPenalty) {
+            double hardnessPenalty,
+            double engineAccelBoost,
+            double engineHardCap,
+            double smallSpeedFactor,
+            double mediumSpeedFactor,
+            double largeSpeedFactor) {
         this.plugin = plugin;
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
@@ -118,6 +128,20 @@ public final class ShipMovementService implements Runnable {
         this.weightPerModule = weightPerModule;
         this.engineBoost = engineBoost;
         this.hardnessPenalty = hardnessPenalty;
+        this.engineAccelBoost = engineAccelBoost;
+        this.engineHardCap = engineHardCap;
+        this.smallSpeedFactor = smallSpeedFactor;
+        this.mediumSpeedFactor = mediumSpeedFactor;
+        this.largeSpeedFactor = largeSpeedFactor;
+    }
+
+    /** Session 2: small fastest, medium slower, large slowest. */
+    private double sizeSpeedFactor(com.glooshy.ships.ship.ShipSize size) {
+        return switch (size) {
+            case SMALL -> smallSpeedFactor;
+            case MEDIUM -> mediumSpeedFactor;
+            case LARGE -> largeSpeedFactor;
+        };
     }
 
     public synchronized void start() {
@@ -186,24 +210,31 @@ public final class ShipMovementService implements Runnable {
             }
 
             if (ship.phase() == LifecyclePhase.FINALIZED) {
-                // CON-10/11 + RQCA-07: module weight slows, harder hulls are
-                // slower. Engines raise the CEILING directly (1 + boost per
-                // engine on top of the base), so a 2-engine ship genuinely
-                // tops out faster, not just accelerates faster.
+                // Session-2 stat composition — everything derived fresh from
+                // the module map each tick (idempotent, nothing accumulates):
+                //   base maxSpeed × size factor × module/hull multiplier
+                // Engines count ONCE (inside the clamped multiplier), sharpen
+                // acceleration separately, and a hard cap keeps stacking from
+                // ever exceeding the configured ceiling.
                 int engineCount = com.glooshy.ships.ship.ShipStats.countType(
                         ship.modules(), com.glooshy.ships.ship.ModuleType.ENGINE);
+                double sizeFactor = sizeSpeedFactor(ship.size());
                 double multiplier = com.glooshy.ships.ship.ShipStats.speedMultiplier(
-                        ship.modules().size(), 0,
+                        ship.modules().size(), engineCount,
                         ship.hullMaterial() != null ? ship.hullMaterial().getHardness() : 0.0,
-                        weightPerModule, 0.0, hardnessPenalty);
-                double effectiveMax = maxSpeed * multiplier * (1.0 + engineCount * engineBoost);
+                        weightPerModule, engineBoost, hardnessPenalty);
+                double hardCap = maxSpeed * sizeFactor * engineHardCap;
+                double effectiveMax = Math.min(maxSpeed * sizeFactor * multiplier, hardCap);
+                double effectiveAccel = acceleration * com.glooshy.ships.ship.ShipStats
+                        .accelerationMultiplier(engineCount, engineAccelBoost, 3.0);
                 ShipMovement movement = movements.computeIfAbsent(
-                        shipId, k -> new ShipMovement(effectiveMax, acceleration, friction));
+                        shipId, k -> new ShipMovement(effectiveMax, effectiveAccel, friction));
                 movement.setMaxSpeed(effectiveMax);
+                movement.setAcceleration(effectiveAccel);
 
                 Player pilot = findPilot(entity);
                 if (pilot != null) {
-                    steerByInput(entity, pilot, movement);
+                    steerByInput(entity, pilot, movement, effectiveMax);
                 } else {
                     movement.disengage();
                 }
@@ -239,10 +270,11 @@ public final class ShipMovementService implements Runnable {
      * tick via the Paper Input API.
      */
     private void steerByInput(@NotNull Entity shipEntity, @NotNull Player pilot,
-                              @NotNull ShipMovement movement) {
+                              @NotNull ShipMovement movement, double effectiveMax) {
         org.bukkit.Input input = pilot.getCurrentInput();
         boolean sprint = input.isSprint();
-        double maxSpeed = sprint ? this.maxSpeed * 1.5 : this.maxSpeed;
+        // Sprint scales the ship's EFFECTIVE ceiling (modules/engines included)
+        double maxSpeed = sprint ? effectiveMax * 1.5 : effectiveMax;
         movement.setMaxSpeed(maxSpeed);
         if (input.isForward()) {
             movement.engage();

@@ -160,7 +160,31 @@ public final class MoreShipsConfig {
     }
 
     public int statsHealthBonus() {
-        return config.getInt("stats.healthBonus", 10);
+        return config.getInt("stats.healthBonus", 100);
+    }
+
+    /** Session 2: engines sharpen acceleration on top of the speed ceiling. */
+    public double statsEngineAccelBoost() {
+        return config.getDouble("stats.engineAccelBoost", 0.5);
+    }
+
+    /** Session 2: absolute speed ceiling multiplier — engine stacking cap. */
+    public double movementEngineHardCap() {
+        return config.getDouble("movement.engineHardCap", 2.0);
+    }
+
+    /** Session 2: small fastest, medium slower, large slowest. */
+    public double movementSizeSpeedFactor(ShipSize size) {
+        return switch (size) {
+            case SMALL -> config.getDouble("movement.sizeSpeedFactor.small", 1.0);
+            case MEDIUM -> config.getDouble("movement.sizeSpeedFactor.medium", 0.8);
+            case LARGE -> config.getDouble("movement.sizeSpeedFactor.large", 0.6);
+        };
+    }
+
+    /** Session 2: arrows deal 75% of their normal damage to ships. */
+    public double combatArrowDamageFactor() {
+        return config.getDouble("combat.arrowDamageFactor", 0.75);
     }
 
     public boolean recipesEnabled() {

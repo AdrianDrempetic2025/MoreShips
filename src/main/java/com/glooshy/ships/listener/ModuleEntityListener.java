@@ -14,6 +14,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -56,16 +57,35 @@ public final class ModuleEntityListener implements Listener {
         this.cannons = cannons;
     }
 
-    /** RQCA-18: right-click a fitted cannon to fire it (FINALIZED ships only). */
-    private void fireCannon(Player player, Ship ship, ModulePos pos, ArmorStand stand) {
+    /**
+     * Session-2 cannon interactions:
+     * <ul>
+     *   <li>sneak + right-click → sit on the cannon (its seat)</li>
+     *   <li>right-click holding snowballs/fuel → load the cannon</li>
+     *   <li>right-click empty-handed → fire (camera steers within the arc)</li>
+     * </ul>
+     */
+    private void useCannon(Player player, Ship ship, ModulePos pos, ArmorStand stand) {
+        ItemStack inHand = player.getInventory().getItemInMainHand();
+        if (player.isSneaking()) {
+            if (!stand.getPassengers().isEmpty()) {
+                player.sendMessage(Component.text(
+                        "This cannon seat is occupied.", NamedTextColor.RED));
+                return;
+            }
+            stand.addPassenger(player);
+            return;
+        }
+        if (!inHand.getType().isAir()) {
+            cannons.load(player, ship, pos, inHand);
+            return;
+        }
         if (ship.phase() != LifecyclePhase.FINALIZED) {
             player.sendMessage(Component.text(
                     "Cannons only fire on finalized ships.", NamedTextColor.RED));
             return;
         }
-        // The cannon's facing: outward from the ship center through this
-        // module's hull grid position, expressed in ship-local coords
-        cannons.fire(player, ship, stand.getLocation(),
+        cannons.fire(player, ship, pos, stand,
                 pos.localX(ship.size()), pos.localZ(ship.size()));
     }
 
@@ -102,7 +122,8 @@ public final class ModuleEntityListener implements Listener {
                 }
                 stand.addPassenger(player);
             }
-            case CANNON -> fireCannon(player, ship, pos, stand);
+            case CANNON -> useCannon(player, ship, pos, stand);
+            default -> { }
         }
     }
 

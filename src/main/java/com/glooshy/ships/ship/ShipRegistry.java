@@ -47,6 +47,21 @@ public final class ShipRegistry {
         this.healthBonusPerModule = bonus;
     }
 
+    /**
+     * Session-2 idempotent max HP: hull base + health-module bonus, derived
+     * fresh from the module map — never accumulated, so repeated
+     * recalculation or a reload can never inflate HP.
+     */
+    private int derivedMaxHp(@Nullable Material hull, Map<ModulePos, ModuleType> modules) {
+        if (hull == null) {
+            return -1;
+        }
+        int base = hpCalculator.computeMaxHp(hull.getHardness());
+        int health = (int) modules.values().stream()
+                .filter(ModuleType.HEALTH::equals).count();
+        return base + health * healthBonusPerModule;
+    }
+
     public Ship createShip(ShipSize size) {
         Objects.requireNonNull(size, "size");
         ShipIdentity identity = generator.generate();
@@ -73,7 +88,7 @@ public final class ShipRegistry {
             }
             int maxHp = hullMaterial != null ? hpCalculator.computeMaxHp(hullMaterial.getHardness()) : -1;
             return new Ship(key, current.size(), LifecyclePhase.HULL_APPLIED, hullMaterial, maxHp, maxHp,
-                    current.modules(), current.cargo());
+                    current.modules(), current.cargo(), current.cannons());
         });
     }
 
@@ -98,7 +113,7 @@ public final class ShipRegistry {
             }
             int newHp = Math.max(0, current.currentHp() - (int) Math.round(amount));
             return new Ship(key, current.size(), current.phase(), current.hullMaterial(), newHp,
-                    current.maxHp(), current.modules(), current.cargo());
+                    current.maxHp(), current.modules(), current.cargo(), current.cannons());
         });
     }
 
@@ -136,14 +151,13 @@ public final class ShipRegistry {
             }
             Map<ModulePos, ModuleType> modules = new HashMap<>(current.modules());
             modules.put(pos, type);
-            int maxHp = current.maxHp();
+            int maxHp = derivedMaxHp(current.hullMaterial(), modules);
             int currentHp = current.currentHp();
-            if (type == ModuleType.HEALTH) {
-                maxHp += healthBonusPerModule;
-                currentHp = currentHp < 0 ? currentHp : currentHp + healthBonusPerModule;
+            if (type == ModuleType.HEALTH && currentHp >= 0) {
+                currentHp += healthBonusPerModule;
             }
             return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
-                    currentHp, maxHp, Map.copyOf(modules), current.cargo());
+                    currentHp, maxHp, Map.copyOf(modules), current.cargo(), current.cannons());
         });
     }
 
@@ -175,14 +189,12 @@ public final class ShipRegistry {
             // interaction layer drops the contents (RQCA-22).
             Map<ModulePos, Map<Integer, Map<String, Object>>> cargo = new HashMap<>(current.cargo());
             cargo.remove(pos);
-            int maxHp = current.maxHp();
-            int currentHp = current.currentHp();
-            if (removedType == ModuleType.HEALTH) {
-                maxHp -= healthBonusPerModule;
-                currentHp = Math.min(currentHp, maxHp);
-            }
+            Map<ModulePos, CannonState> cannons = new HashMap<>(current.cannons());
+            cannons.remove(pos);
+            int maxHp = derivedMaxHp(current.hullMaterial(), modules);
+            int currentHp = Math.min(current.currentHp(), maxHp);
             return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
-                    currentHp, maxHp, Map.copyOf(modules), Map.copyOf(cargo));
+                    currentHp, maxHp, Map.copyOf(modules), Map.copyOf(cargo), Map.copyOf(cannons));
         });
     }
 
@@ -229,7 +241,7 @@ public final class ShipRegistry {
                 cargo.put(to, hold);
             }
             return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), Map.copyOf(modules), Map.copyOf(cargo));
+                    current.currentHp(), current.maxHp(), Map.copyOf(modules), Map.copyOf(cargo), current.cannons());
         });
     }
 
@@ -252,7 +264,54 @@ public final class ShipRegistry {
                     new HashMap<>(current.cargo());
             cargo.put(pos, Map.copyOf(contents));
             return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), current.modules(), Map.copyOf(cargo));
+                    current.currentHp(), current.maxHp(), current.modules(), Map.copyOf(cargo), current.cannons());
+        });
+    }
+
+    /**
+     * Replace the whole cannon state of one module position (inventory close
+     * path). Returns the updated ship.
+     *
+     * @throws IllegalStateException if the ship is not found
+     */
+    public Ship setCannon(ShipIdentity identity, ModulePos pos, CannonState state) {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(pos, "pos");
+        Objects.requireNonNull(state, "state");
+        return ships.compute(identity, (key, current) -> {
+            if (current == null) {
+                throw new IllegalStateException("Ship not found: " + identity);
+            }
+            Map<ModulePos, CannonState> cannons = new HashMap<>(current.cannons());
+            cannons.put(pos, state);
+            return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
+                    current.currentHp(), current.maxHp(), current.modules(), current.cargo(),
+                    Map.copyOf(cannons));
+        });
+    }
+
+    /**
+     * Atomically transform one cannon's state (fire/fuel consumption path).
+     * The operator runs inside the registry's compute — exactly-once per call,
+     * race-free against other cannon updates. Returns the updated ship.
+     *
+     * @throws IllegalStateException if the ship is not found
+     */
+    public Ship mutateCannon(ShipIdentity identity, ModulePos pos,
+                             java.util.function.UnaryOperator<CannonState> operator) {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(pos, "pos");
+        Objects.requireNonNull(operator, "operator");
+        return ships.compute(identity, (key, current) -> {
+            if (current == null) {
+                throw new IllegalStateException("Ship not found: " + identity);
+            }
+            Map<ModulePos, CannonState> cannons = new HashMap<>(current.cannons());
+            cannons.compute(pos, (p, existing) ->
+                    operator.apply(existing == null ? CannonState.empty() : existing));
+            return new Ship(key, current.size(), current.phase(), current.hullMaterial(),
+                    current.currentHp(), current.maxHp(), current.modules(), current.cargo(),
+                    Map.copyOf(cannons));
         });
     }
 
@@ -272,7 +331,7 @@ public final class ShipRegistry {
                 return null;
             }
             return new Ship(key, current.size(), newPhase, current.hullMaterial(),
-                    current.currentHp(), current.maxHp(), current.modules(), current.cargo());
+                    current.currentHp(), current.maxHp(), current.modules(), current.cargo(), current.cannons());
         });
     }
 

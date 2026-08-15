@@ -33,7 +33,8 @@ public record Ship(
         int currentHp,
         int maxHp,
         Map<ModulePos, ModuleType> modules,
-        Map<ModulePos, Map<Integer, Map<String, Object>>> cargo) {
+        Map<ModulePos, Map<Integer, Map<String, Object>>> cargo,
+        Map<ModulePos, CannonState> cannons) {
 
     private static final int CARGO_HOLD_SIZE = 27;
 
@@ -43,6 +44,7 @@ public record Ship(
         Objects.requireNonNull(phase, "phase");
         modules = modules == null ? Map.of() : Map.copyOf(modules);
         cargo = cargo == null ? Map.of() : Map.copyOf(cargo);
+        cannons = cannons == null ? Map.of() : Map.copyOf(cannons);
     }
 
     public static int cargoHoldSize() {
@@ -52,13 +54,21 @@ public record Ship(
     /** Convenience: new UNFINISHED ship of the given size, no hull/HP/modules. */
     public Ship(ShipIdentity identity, ShipSize size, LifecyclePhase phase,
                 @Nullable Material hullMaterial) {
-        this(identity, size, phase, hullMaterial, -1, -1, Map.of(), Map.of());
+        this(identity, size, phase, hullMaterial, -1, -1, Map.of(), Map.of(), Map.of());
     }
 
-    /** Convenience: no modules, no cargo. */
+    /** Convenience: no modules, no cargo, no cannons. */
     public Ship(ShipIdentity identity, ShipSize size, LifecyclePhase phase,
                 @Nullable Material hullMaterial, int currentHp, int maxHp) {
-        this(identity, size, phase, hullMaterial, currentHp, maxHp, Map.of(), Map.of());
+        this(identity, size, phase, hullMaterial, currentHp, maxHp, Map.of(), Map.of(), Map.of());
+    }
+
+    /** Full state minus cannons (pre-Session-2 call sites). */
+    public Ship(ShipIdentity identity, ShipSize size, LifecyclePhase phase,
+                @Nullable Material hullMaterial, int currentHp, int maxHp,
+                Map<ModulePos, ModuleType> modules,
+                Map<ModulePos, Map<Integer, Map<String, Object>>> cargo) {
+        this(identity, size, phase, hullMaterial, currentHp, maxHp, modules, cargo, Map.of());
     }
 
     public boolean hasCargoModule() {

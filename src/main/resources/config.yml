@@ -58,6 +58,14 @@ movement:
   # Hull turn rate in degrees per tick while the pilot steers (A/D),
   # vanilla-boat style. 4.0 = ~72 degrees/second.
   turnRate: 4.0
+  # Session 2: speed factor per ship size — small fastest, large slowest.
+  sizeSpeedFactor:
+    small: 1.0
+    medium: 0.8
+    large: 0.6
+  # Session 2: absolute ceiling on engine stacking — effective max speed can
+  # never exceed maxSpeed × sizeFactor × engineHardCap, no matter the modules.
+  engineHardCap: 2.0
 
 modules:
   # Base vanilla material per module type (RQCA-08). The PersistentDataContainer
@@ -116,13 +124,19 @@ recipes:
   enabled: true
 
 stats:
-  # Module-driven statistics (CON-10/11, RQCA-07).
+  # Module-driven statistics (CON-10/11, RQCA-07, Session 2).
   # Speed multiplier per ship = 1 - modules*weight + engines*boost - hardness*penalty
-  # (clamped 0.4..1.6). Health modules add healthBonus max HP each.
+  # (clamped 0.3..2.0). Health modules add healthBonus max HP each.
   weightPerModule: 0.08
   engineBoost: 0.25
   hardnessPenalty: 0.006
-  healthBonus: 10
+  healthBonus: 100
+  # Session 2: each engine also multiplies acceleration (capped at 3x).
+  engineAccelBoost: 0.5
+
+combat:
+  # Session 2: arrows deal this fraction of their normal damage to ships.
+  arrowDamageFactor: 0.75
 
 modules:
   engine:

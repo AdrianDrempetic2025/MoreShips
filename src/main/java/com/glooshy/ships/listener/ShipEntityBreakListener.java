@@ -8,6 +8,7 @@ import com.glooshy.ships.visual.CustomModelVisualManager;
 import com.glooshy.ships.runtime.ShipHitboxManager;
 import com.glooshy.ships.item.ShipCoreItem;
 import com.glooshy.ships.runtime.RuntimeBinding;
+import com.glooshy.ships.runtime.ShipDestructionService;
 import com.glooshy.ships.runtime.RuntimeBindingRegistry;
 import com.glooshy.ships.ship.LifecyclePhase;
 import com.glooshy.ships.ship.Ship;
@@ -65,6 +66,8 @@ public final class ShipEntityBreakListener implements Listener {
     private final ModuleEntityManager moduleEntities;
     private final ShipHitboxManager hitboxes;
     private final CustomModelVisualManager modelVisuals;
+    private final com.glooshy.ships.runtime.ShipDestructionService destructionService;
+    private final double arrowDamageFactor;
 
     public ShipEntityBreakListener(
             ShipCoreItem shipCoreItem,
@@ -76,7 +79,9 @@ public final class ShipEntityBreakListener implements Listener {
             CustomModelVisualManager modelVisuals,
             RuntimeBindingRegistry bindingRegistry,
             ShipRegistry shipRegistry,
-            ShipTeardownService teardownService) {
+            ShipTeardownService teardownService,
+            com.glooshy.ships.runtime.ShipDestructionService destructionService,
+            double arrowDamageFactor) {
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.cargoService = cargoService;
@@ -87,6 +92,8 @@ public final class ShipEntityBreakListener implements Listener {
         this.bindingRegistry = bindingRegistry;
         this.shipRegistry = shipRegistry;
         this.teardownService = teardownService;
+        this.destructionService = destructionService;
+        this.arrowDamageFactor = arrowDamageFactor;
     }
 
     @EventHandler
@@ -167,29 +174,30 @@ public final class ShipEntityBreakListener implements Listener {
     }
 
     private void handleFinalizedDamage(EntityDamageEvent event, ArmorStand stand, Ship ship) {
+        // Session-2 damage selectivity:
+        //  - arrows deal 75% of their normal damage
+        //  - melee only damages on a CRITICAL hit (falling attack)
+        //  - everything else (explosions, cannon projectiles via their own
+        //    listener path) applies as-is
         double damage = event.getFinalDamage();
+        if (isArrowDamage(event)) {
+            damage *= arrowDamageFactor;
+        } else if (isMeleeDamage(event)) {
+            Player attacker = damagerAsPlayer(event);
+            if (!ShipDestructionService.isCriticalMelee(attacker)) {
+                if (attacker != null) {
+                    attacker.sendMessage(Component.text(
+                            "Only critical hits (attack while falling) harm a ship.",
+                            NamedTextColor.GRAY));
+                }
+                return;
+            }
+        }
+
         Ship after = shipRegistry.applyDamage(ship.identity(), damage);
 
         if (after.currentHp() <= 0) {
-            // Ship destroyed
-            Player attacker = damagerAsPlayer(event);
-            String id = ship.identity().encoded();
-            dropModules(stand, after);
-            dropCargo(stand, after);
-            moduleEntities.despawnAll(ship.identity());
-            hitboxes.despawn(ship.identity());
-            modelVisuals.despawn(ship.identity());
-            try {
-                shipRegistry.transition(ship.identity(), LifecyclePhase.DESTROYED);
-            } catch (IllegalStateException ignored) {
-                // Race — best effort
-            }
-            bindingRegistry.release(ship.identity());
-            stand.remove();
-            if (attacker != null) {
-                attacker.sendMessage(Component.text(
-                        "Ship " + id + " destroyed.", NamedTextColor.RED));
-            }
+            destructionService.destroy(stand, after, damagerAsPlayer(event));
             return;
         }
 
@@ -198,6 +206,18 @@ public final class ShipEntityBreakListener implements Listener {
                 "Ship " + shortId(ship.identity()) + " [" + after.currentHp()
                         + "/" + after.maxHp() + " HP]",
                 NamedTextColor.AQUA));
+    }
+
+    private static boolean isArrowDamage(EntityDamageEvent event) {
+        return event.getCause() == EntityDamageEvent.DamageCause.PROJECTILE
+                && event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof org.bukkit.entity.AbstractArrow;
+    }
+
+    private static boolean isMeleeDamage(EntityDamageEvent event) {
+        return event.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK
+                && event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof Player;
     }
 
     /**

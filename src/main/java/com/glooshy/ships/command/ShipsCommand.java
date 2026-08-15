@@ -41,7 +41,7 @@ import org.jetbrains.annotations.Nullable;
 public final class ShipsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("give", "info", "finalize", "module", "cargo", "debug", "reload", "recipes", "help");
+            List.of("give", "info", "finalize", "module", "cargo", "cannon", "debug", "reload", "recipes", "help");
 
     private static final List<String> MODULE_SUBCOMMANDS = List.of("list", "remove", "move");
 
@@ -57,6 +57,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
     private final ShipEntityResolver resolver;
     private final CustomModelVisualManager modelVisuals;
     private final org.bukkit.plugin.java.JavaPlugin plugin;
+    private final com.glooshy.ships.combat.CannonService cannons;
 
     public ShipsCommand(ShipCoreItem shipCoreItem,
                         ModuleItem moduleItem,
@@ -67,7 +68,9 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                         ModuleEntityManager moduleEntities,
                         ShipEntityResolver resolver,
                         CustomModelVisualManager modelVisuals,
-                        org.bukkit.plugin.java.JavaPlugin plugin) {
+                        org.bukkit.plugin.java.JavaPlugin plugin,
+                        com.glooshy.ships.combat.CannonService cannons) {
+        this.cannons = cannons;
         this.shipCoreItem = shipCoreItem;
         this.moduleItem = moduleItem;
         this.shipRegistry = shipRegistry;
@@ -93,6 +96,7 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
             case "finalize" -> handleFinalize(sender);
             case "module" -> handleModule(sender, args);
             case "cargo" -> handleCargo(sender);
+            case "cannon" -> handleCannon(sender);
             case "debug" -> handleDebug(sender);
             case "reload" -> {
                 plugin.reloadConfig();
@@ -437,6 +441,31 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    /** Session 2: open the inventory of the cannon module you are looking at. */
+    private void handleCannon(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can open cannons.", NamedTextColor.RED));
+            return;
+        }
+        Entity target = player.getTargetEntity(TARGET_RAYTRACE_DISTANCE);
+        var binding = target == null ? java.util.Optional.<com.glooshy.ships.runtime.ModuleEntityManager.ModuleEntityBinding>empty()
+                : moduleEntities.resolve(target.getUniqueId());
+        if (binding.isEmpty()) {
+            player.sendMessage(Component.text(
+                    "Look at a CANNON module within " + TARGET_RAYTRACE_DISTANCE
+                            + " blocks first.", NamedTextColor.RED));
+            return;
+        }
+        Optional<Ship> shipOpt = shipRegistry.find(binding.get().shipId());
+        if (shipOpt.isEmpty() || shipOpt.get().modules().get(binding.get().pos())
+                != ModuleType.CANNON) {
+            player.sendMessage(Component.text(
+                    "That module is not a cannon.", NamedTextColor.RED));
+            return;
+        }
+        cannons.openInventory(player, shipOpt.get(), binding.get().pos());
+    }
+
     private void handleCargo(CommandSender sender) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Component.text("Only players can open cargo.", NamedTextColor.RED));
@@ -502,6 +531,8 @@ public final class ShipsCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" — move a module to another slot", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships cargo", NamedTextColor.AQUA)
                 .append(Component.text(" — open the cargo hold of the ship you are looking at (needs a Cargo Module)", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/moreships cannon", NamedTextColor.AQUA)
+                .append(Component.text(" — open the inventory of the cannon you are looking at (fuel + snowballs)", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/moreships debug", NamedTextColor.AQUA)
                 .append(Component.text(" — show last interact + main hand state", NamedTextColor.GRAY)));
     }

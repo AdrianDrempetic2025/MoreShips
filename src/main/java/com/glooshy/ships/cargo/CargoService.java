@@ -4,10 +4,13 @@ import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.ModuleType;
 import com.glooshy.ships.ship.Ship;
 import com.glooshy.ships.ship.ShipRegistry;
+import com.glooshy.ships.identity.ShipIdentity;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -22,6 +25,9 @@ import org.bukkit.inventory.ItemStack;
 public final class CargoService {
 
     private final ShipRegistry shipRegistry;
+    /** Live open holds — the freshest cargo state (Session-2 anti-dup). */
+    private final Map<ShipIdentity, Map<ModulePos, Inventory>> openInventories =
+            new ConcurrentHashMap<>();
 
     public CargoService(ShipRegistry shipRegistry) {
         this.shipRegistry = shipRegistry;
@@ -52,7 +58,40 @@ public final class CargoService {
             }
         });
 
+        openInventories.computeIfAbsent(ship.identity(), k -> new ConcurrentHashMap<>())
+                .put(pos, inventory);
         player.openInventory(inventory);
+    }
+
+    public void markClosed(ShipIdentity shipId, ModulePos pos) {
+        Map<ModulePos, Inventory> open = openInventories.get(shipId);
+        if (open != null) {
+            open.remove(pos);
+        }
+    }
+
+    /**
+     * Destruction path: drop the LIVE contents of any open cargo inventory
+     * (the freshest copy) and clear it. Returns the positions whose contents
+     * were handled — the caller must NOT also drop the serialized holds for
+     * those, or items would duplicate.
+     */
+    public java.util.Set<ModulePos> dropOpenAndClose(ShipIdentity shipId, Location dropAt) {
+        Map<ModulePos, Inventory> open = openInventories.remove(shipId);
+        if (open == null) {
+            return java.util.Set.of();
+        }
+        java.util.Set<ModulePos> handled = new java.util.HashSet<>();
+        for (Map.Entry<ModulePos, Inventory> entry : open.entrySet()) {
+            for (ItemStack item : entry.getValue().getContents()) {
+                if (item != null && !item.getType().isAir()) {
+                    dropAt.getWorld().dropItemNaturally(dropAt, item);
+                }
+            }
+            entry.getValue().clear();
+            handled.add(entry.getKey());
+        }
+        return handled;
     }
 
     /**
@@ -68,6 +107,7 @@ public final class CargoService {
             }
             contents.put(index, item.serialize());
         }
+        markClosed(holder.shipId(), holder.pos());
         try {
             shipRegistry.setCargo(holder.shipId(), holder.pos(), contents);
             return true;

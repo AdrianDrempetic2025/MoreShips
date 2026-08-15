@@ -94,8 +94,9 @@ public final class MoreShips extends JavaPlugin {
         ShipTeardownService teardownService = new ShipTeardownService(shipRegistry, bindingRegistry);
         HullValidator hullValidator = new HullValidator(config.hullMinHardness());
         CargoService cargoService = new CargoService(shipRegistry);
+        com.glooshy.ships.combat.CannonAimTracker cannonAims = new com.glooshy.ships.combat.CannonAimTracker();
         moduleEntities = new ModuleEntityManager(
-                shipIdKey, moduleSlotKey, shipRegistry, bindingRegistry, moduleItem);
+                shipIdKey, moduleSlotKey, shipRegistry, bindingRegistry, moduleItem, cannonAims);
         hitboxes = new ShipHitboxManager(
                 shipIdKey, bindingRegistry, shipRegistry,
                 config.shipHitboxWidth(), config.shipHitboxHeight());
@@ -118,9 +119,19 @@ public final class MoreShips extends JavaPlugin {
                 config.placementSoundPitch());
         getServer().getPluginManager().registerEvents(placementListener, this);
 
+        org.bukkit.NamespacedKey cannonMarker = new org.bukkit.NamespacedKey(this, "cannon_shot");
+        com.glooshy.ships.combat.CannonService cannonService = new com.glooshy.ships.combat.CannonService(
+                shipRegistry, cannonMarker,
+                config.cannonDamage(), config.cannonCooldownMillis(), config.cannonSpeed(), cannonAims);
+        com.glooshy.ships.runtime.ShipDestructionService destructionService =
+                new com.glooshy.ships.runtime.ShipDestructionService(
+                        shipRegistry, bindingRegistry, moduleEntities, hitboxes, modelVisuals,
+                        cargoService, cannonService, moduleItem);
+
         ShipEntityBreakListener breakListener = new ShipEntityBreakListener(
                 shipCoreItem, moduleItem, cargoService, moduleEntities,
-                resolver, hitboxes, modelVisuals, bindingRegistry, shipRegistry, teardownService);
+                resolver, hitboxes, modelVisuals, bindingRegistry, shipRegistry, teardownService,
+                destructionService, config.combatArrowDamageFactor());
         getServer().getPluginManager().registerEvents(breakListener, this);
 
         HullApplicationListener hullListener = new HullApplicationListener(
@@ -131,21 +142,19 @@ public final class MoreShips extends JavaPlugin {
                 new ShipConfigUiListener(shipRegistry, resolver, moduleItem, moduleEntities,
                         cargoService), this);
 
-        org.bukkit.NamespacedKey cannonMarker = new org.bukkit.NamespacedKey(this, "cannon_shot");
-        com.glooshy.ships.combat.CannonService cannonService = new com.glooshy.ships.combat.CannonService(
-                shipRegistry, cannonMarker,
-                config.cannonDamage(), config.cannonCooldownMillis(), config.cannonSpeed());
         getServer().getPluginManager().registerEvents(
                 new ModuleEntityListener(moduleEntities, shipRegistry, cargoService, moduleItem,
                         cannonService), this);
         getServer().getPluginManager().registerEvents(
-                new com.glooshy.ships.listener.CannonHitListener(cannonService, resolver), this);
+                new com.glooshy.ships.listener.CannonHitListener(cannonService, resolver, destructionService), this);
 
         getServer().getPluginManager().registerEvents(
                 new com.glooshy.ships.listener.RecipeBookListener(shipCoreItem, moduleItem), this);
 
         getServer().getPluginManager().registerEvents(
                 new CargoInventoryListener(cargoService), this);
+        getServer().getPluginManager().registerEvents(
+                new com.glooshy.ships.listener.CannonInventoryListener(cannonService), this);
 
         String packUrl = config.resourcePackUrl();
         if (!packUrl.isBlank()) {
@@ -180,7 +189,12 @@ public final class MoreShips extends JavaPlugin {
                     config.movementTurnRate(),
                     config.statsWeightPerModule(),
                     config.statsEngineBoost(),
-                    config.statsHardnessPenalty());
+                    config.statsHardnessPenalty(),
+                    config.statsEngineAccelBoost(),
+                    config.movementEngineHardCap(),
+                    config.movementSizeSpeedFactor(ShipSize.SMALL),
+                    config.movementSizeSpeedFactor(ShipSize.MEDIUM),
+                    config.movementSizeSpeedFactor(ShipSize.LARGE));
             movementService.start();
             getLogger().info("Movement service started: maxSpeed=" + config.movementMaxSpeed()
                     + " accel=" + config.movementAcceleration()
@@ -193,7 +207,7 @@ public final class MoreShips extends JavaPlugin {
 
         ShipsCommand shipsCommand = new ShipsCommand(
                 shipCoreItem, moduleItem, shipRegistry, bindingRegistry, placementListener,
-                cargoService, moduleEntities, resolver, modelVisuals, this);
+                cargoService, moduleEntities, resolver, modelVisuals, this, cannonService);
         PluginCommand command = getCommand("moreships");
         if (command != null) {
             command.setExecutor(shipsCommand);
@@ -202,7 +216,7 @@ public final class MoreShips extends JavaPlugin {
             getLogger().severe("Could not find /moreships command — plugin.yml misconfiguration?");
         }
 
-        getLogger().info("MoreShips enabled (BUILD-33). Recipe book UI + stronger stat spread.");
+        getLogger().info("MoreShips enabled (BUILD-34, Session 2). Cannons: fuel+ammo+aim; damage selectivity; size speeds.");
     }
 
     @Override

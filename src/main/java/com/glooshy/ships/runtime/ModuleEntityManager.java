@@ -46,6 +46,7 @@ public final class ModuleEntityManager {
     private final ShipRegistry shipRegistry;
     private final RuntimeBindingRegistry bindingRegistry;
     private final ModuleItem moduleItem;
+    private final com.glooshy.ships.combat.CannonAimTracker cannonAims;
 
     private final Map<UUID, ModuleEntityBinding> byEntity = new ConcurrentHashMap<>();
     private final Map<ShipIdentity, Map<ModulePos, UUID>> byShip = new ConcurrentHashMap<>();
@@ -55,11 +56,21 @@ public final class ModuleEntityManager {
                                ShipRegistry shipRegistry,
                                RuntimeBindingRegistry bindingRegistry,
                                ModuleItem moduleItem) {
+        this(shipIdKey, slotKey, shipRegistry, bindingRegistry, moduleItem, null);
+    }
+
+    public ModuleEntityManager(NamespacedKey shipIdKey,
+                               NamespacedKey slotKey,
+                               ShipRegistry shipRegistry,
+                               RuntimeBindingRegistry bindingRegistry,
+                               ModuleItem moduleItem,
+                               com.glooshy.ships.combat.CannonAimTracker cannonAims) {
         this.shipIdKey = shipIdKey;
         this.slotKey = slotKey;
         this.shipRegistry = shipRegistry;
         this.bindingRegistry = bindingRegistry;
         this.moduleItem = moduleItem;
+        this.cannonAims = cannonAims;
     }
 
     /** Resolve a clicked/damaged entity to its ship + slot. */
@@ -173,9 +184,19 @@ public final class ModuleEntityManager {
                 continue;
             }
             Location target = moduleLocation(base, shipId, entry.getKey());
+            // A cannon holding a live aim keeps its barrel pointed there;
+            // everything else (and expired aims) rests aligned with the ship
+            if (entry.getValue() == ModuleType.CANNON && cannonAims != null) {
+                var aim = cannonAims.live(shipId, entry.getKey());
+                if (aim != null) {
+                    target.setYaw(aim.yaw());
+                    target.setPitch(aim.pitch());
+                }
+            }
             Location current = entity.getLocation();
             if (current.distanceSquared(target) > 0.0001
-                    || current.getYaw() != base.getYaw()) {
+                    || current.getYaw() != target.getYaw()
+                    || current.getPitch() != target.getPitch()) {
                 entity.teleport(target);
             }
         }

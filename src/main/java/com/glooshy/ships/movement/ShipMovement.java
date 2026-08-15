@@ -18,6 +18,7 @@ package com.glooshy.ships.movement;
 public final class ShipMovement {
 
     private double maxSpeed;
+    private double accel;
     private final double acceleration;
     private final double friction;
 
@@ -39,6 +40,7 @@ public final class ShipMovement {
         }
         this.maxSpeed = maxSpeed;
         this.acceleration = acceleration;
+        this.accel = acceleration;
         this.friction = friction;
     }
 
@@ -75,6 +77,14 @@ public final class ShipMovement {
         maxSpeed = newMax;
     }
 
+    /** Engines retune acceleration on the fly (Session 2). */
+    public void setAcceleration(double newAcceleration) {
+        if (newAcceleration <= 0.0) {
+            return;
+        }
+        accel = newAcceleration;
+    }
+
     public void disengage() {
         engaged = false;
     }
@@ -86,7 +96,7 @@ public final class ShipMovement {
     public void tick() {
         double target = engaged ? maxSpeed : 0.0;
         if (currentSpeed < target) {
-            currentSpeed = Math.min(target, currentSpeed + acceleration);
+            currentSpeed = Math.min(target, currentSpeed + accel);
         } else if (currentSpeed > target) {
             currentSpeed = Math.max(target, currentSpeed - friction);
         }

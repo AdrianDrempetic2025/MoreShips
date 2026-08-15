@@ -26,10 +26,13 @@ public final class CannonHitListener implements Listener {
 
     private final CannonService cannons;
     private final ShipEntityResolver resolver;
+    private final com.glooshy.ships.runtime.ShipDestructionService destruction;
 
-    public CannonHitListener(CannonService cannons, ShipEntityResolver resolver) {
+    public CannonHitListener(CannonService cannons, ShipEntityResolver resolver,
+                             com.glooshy.ships.runtime.ShipDestructionService destruction) {
         this.cannons = cannons;
         this.resolver = resolver;
+        this.destruction = destruction;
     }
 
     @EventHandler
@@ -69,12 +72,22 @@ public final class CannonHitListener implements Listener {
         Ship after = cannons.registry().applyDamage(hitShipId.get(), cannons.damage());
 
         if (after.currentHp() <= 0) {
-            // Destruction path runs in ShipEntityBreakListener via the next
-            // hull damage; here we only report. (Snowball impact itself is
-            // not a hull damage event.)
-            if (shot.getShooter() instanceof Player shooter) {
-                shooter.sendMessage(Component.text(
-                        "Direct hit — enemy ship destroyed!", NamedTextColor.RED));
+            // Session 2: a cannon kill destroys the ship IMMEDIATELY — the
+            // shared path dismounts, conserves, despawns and removes cleanly.
+            Player shooter = shot.getShooter() instanceof Player p ? p : null;
+            if (hit instanceof ArmorStand stand) {
+                destruction.destroy(stand, after, shooter);
+            } else {
+                // Hitbox segment/cell — resolve the controller stand
+                resolver.shipStandOf(hit).ifPresentOrElse(
+                        stand -> destruction.destroy(stand, after, shooter),
+                        () -> {
+                            if (shooter != null) {
+                                shooter.sendMessage(Component.text(
+                                        "Direct hit — enemy ship destroyed!",
+                                        NamedTextColor.RED));
+                            }
+                        });
             }
             return;
         }

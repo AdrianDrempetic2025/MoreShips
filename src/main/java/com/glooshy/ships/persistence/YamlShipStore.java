@@ -1,6 +1,7 @@
 package com.glooshy.ships.persistence;
 
 import com.glooshy.ships.identity.ShipIdentity;
+import com.glooshy.ships.ship.CannonState;
 import com.glooshy.ships.ship.LifecyclePhase;
 import com.glooshy.ships.ship.ModulePos;
 import com.glooshy.ships.ship.ModuleType;
@@ -102,6 +103,23 @@ public final class YamlShipStore implements ShipStore {
                 });
                 entry.put("cargo", cargo);
             }
+            if (!ship.cannons().isEmpty()) {
+                Map<String, Object> cannons = new LinkedHashMap<>();
+                ship.cannons().forEach((pos, state) -> {
+                    Map<String, Object> cs = new LinkedHashMap<>();
+                    cs.put("shots", state.shots());
+                    List<Map<String, Object>> rows = new ArrayList<>(state.inventory().size());
+                    state.inventory().forEach((index, item) -> {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        row.put("slot", index);
+                        row.put("item", item);
+                        rows.add(row);
+                    });
+                    cs.put("inventory", rows);
+                    cannons.put(pos.encoded(), cs);
+                });
+                entry.put("cannons", cannons);
+            }
             data.add(entry);
         }
         yaml.set("ships", data);
@@ -196,8 +214,44 @@ public final class YamlShipStore implements ShipStore {
             }
         }
 
+        Map<ModulePos, CannonState> cannons = new LinkedHashMap<>();
+        Object cannonsRaw = map.get("cannons");
+        Map<String, Object> cannonsBySlot = cannonsRaw instanceof MemorySection section2
+                ? section2.getValues(false)
+                : (cannonsRaw instanceof Map<?, ?> raw2 ? asStringMap(raw2) : null);
+        if (cannonsBySlot != null) {
+            for (Map.Entry<String, Object> cannonEntry : cannonsBySlot.entrySet()) {
+                ModulePos cannonPos = ModulePos.decode(cannonEntry.getKey());
+                if (cannonPos == null || !size.isValid(cannonPos)) {
+                    continue;
+                }
+                if (!(cannonEntry.getValue() instanceof Map<?, ?> cannonRawMap)) {
+                    continue;
+                }
+                Map<String, Object> cannonMap = asStringMap(cannonRawMap);
+                int shots = cannonMap.get("shots") instanceof Number n3 ? n3.intValue() : 0;
+                Map<Integer, Map<String, Object>> inv = new LinkedHashMap<>();
+                if (cannonMap.get("inventory") instanceof List<?> invRows) {
+                    for (Object row : invRows) {
+                        Map<String, Object> rowMap = row instanceof MemorySection rowSection
+                                ? rowSection.getValues(false)
+                                : (row instanceof Map<?, ?> raw3 ? asStringMap(raw3) : null);
+                        if (rowMap == null) {
+                            continue;
+                        }
+                        if (!(rowMap.get("slot") instanceof Number index2)
+                                || !(rowMap.get("item") instanceof Map<?, ?>)) {
+                            continue;
+                        }
+                        inv.put(index2.intValue(), asStringMap((Map<?, ?>) rowMap.get("item")));
+                    }
+                }
+                cannons.put(cannonPos, new CannonState(shots, inv));
+            }
+        }
+
         return new Ship(identity, size, phase, hull, currentHp, maxHp,
-                Map.copyOf(modules), Map.copyOf(cargo));
+                Map.copyOf(modules), Map.copyOf(cargo), Map.copyOf(cannons));
     }
 
     private static Map<String, Object> asStringMap(Map<?, ?> raw) {

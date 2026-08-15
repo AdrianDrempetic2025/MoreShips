@@ -30,6 +30,16 @@ public final class ShipStats {
         return healthModules * healthBonusPerModule;
     }
 
+    /**
+     * Session-2: engines also sharpen ACCELERATION, not just the ceiling —
+     * a ship with engines visibly gets up to speed faster. Linear per engine,
+     * capped so stacking stays predictable.
+     */
+    public static double accelerationMultiplier(int engineCount, double engineAccelBoost,
+                                                double cap) {
+        return Math.min(cap, 1.0 + engineCount * engineAccelBoost);
+    }
+
     public static int countType(Map<ModulePos, ModuleType> modules, ModuleType type) {
         return (int) modules.values().stream().filter(type::equals).count();
     }
