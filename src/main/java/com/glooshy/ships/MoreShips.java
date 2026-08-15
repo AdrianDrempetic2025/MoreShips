@@ -169,7 +169,11 @@ public final class MoreShips extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
                 @org.bukkit.event.EventHandler
                 public void onJoin(org.bukkit.event.player.PlayerJoinEvent event) {
-                    event.getPlayer().setResourcePack(packUrl);
+                    // Cache-buster: without a change the client keeps its
+                    // cached copy of the same URL and NEVER sees pack updates
+                    event.getPlayer().setResourcePack(
+                            packUrl + (packUrl.contains("?") ? "&" : "?")
+                                    + "v=" + getPluginMeta().getVersion());
                 }
             }, this);
             getLogger().info("Resource pack push enabled: " + packUrl);
